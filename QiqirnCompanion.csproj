@@ -9,10 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Embed manifest so Dalamud can read it from the DLL (required in v15+) -->
-    <EmbeddedResource Include="manifest.json">
-      <LogicalName>QiqirnCompanion.json</LogicalName>
-    </EmbeddedResource>
+    <!-- Copy manifest alongside DLL — Dalamud v15 reads {AssemblyName}.json next to the DLL -->
+    <None Include="QiqirnCompanion.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
