@@ -10,7 +10,7 @@
   "AssemblyVersion": "1.0.0.0",
   "RepoUrl": "https://github.com/EstherMartz/qiqirn-companion",
   "ApplicableVersion": "any",
-  "DalamudApiLevel": 12,
+  "DalamudApiLevel": 15,
   "LoadRequiredState": 0,
   "LoadSync": false,
   "LoadPriority": 0,
