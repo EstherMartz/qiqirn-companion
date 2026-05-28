@@ -9,6 +9,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Embed manifest so Dalamud can read it from the DLL (required in v15+) -->
+    <EmbeddedResource Include="manifest.json">
+      <LogicalName>QiqirnCompanion.json</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Runtime DLLs provided by XIVLauncher — mark Private=false so they
          are NOT copied to the output folder (game loads them at runtime). -->
     <Reference Include="Dalamud">
