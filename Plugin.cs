@@ -20,6 +20,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly WindowSystem  _windowSystem  = new("QiqirnCompanion");
     private readonly MainWindow    _mainWindow;
     private readonly ConfigWindow  _configWindow;
+    private readonly SearchWindow  _searchWindow;
 
     public Plugin(
         IDalamudPluginInterface pluginInterface,
@@ -39,8 +40,10 @@ public sealed class Plugin : IDalamudPlugin
         // Windows
         _mainWindow   = new MainWindow(Config, _api, playerState);
         _configWindow = new ConfigWindow(Config);
+        _searchWindow = new SearchWindow(_api);
         _windowSystem.AddWindow(_mainWindow);
         _windowSystem.AddWindow(_configWindow);
+        _windowSystem.AddWindow(_searchWindow);
 
         // Slash command
         _commands.AddHandler(CommandName, new CommandInfo(OnCommand)

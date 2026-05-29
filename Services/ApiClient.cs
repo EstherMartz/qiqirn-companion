@@ -42,6 +42,65 @@ public record CraftableItem(
     [property: JsonPropertyName("velocity")] double Velocity
 );
 
+public record ItemSearchResult(
+    [property: JsonPropertyName("id")]        int  Id,
+    [property: JsonPropertyName("name")]      string Name,
+    [property: JsonPropertyName("hasRecipe")] bool HasRecipe,
+    [property: JsonPropertyName("rarity")]    int  Rarity
+);
+
+public record ItemsPageResponse(
+    [property: JsonPropertyName("items")]     List<ItemSearchResult> Items,
+    [property: JsonPropertyName("total")]     int Total,
+    [property: JsonPropertyName("page")]      int Page,
+    [property: JsonPropertyName("pageSize")]  int PageSize
+);
+
+public abstract record ItemSource(
+    [property: JsonPropertyName("type")] string Type
+);
+
+public record RecipeSource(
+    [property: JsonPropertyName("type")]        string Type,
+    [property: JsonPropertyName("jobId")]       int JobId,
+    [property: JsonPropertyName("jobName")]     string JobName,
+    [property: JsonPropertyName("level")]       int Level,
+    [property: JsonPropertyName("ingredients")] List<(int ItemId, string ItemName, int Qty)> Ingredients,
+    [property: JsonPropertyName("outputQty")]   int OutputQty
+) : ItemSource(Type);
+
+public record VendorSource(
+    [property: JsonPropertyName("type")]    string Type,
+    [property: JsonPropertyName("npcId")]   int NpcId,
+    [property: JsonPropertyName("npcName")] string NpcName,
+    [property: JsonPropertyName("price")]   int Price
+) : ItemSource(Type);
+
+public record GatheringSource(
+    [property: JsonPropertyName("type")]  string Type,
+    [property: JsonPropertyName("level")] int Level,
+    [property: JsonPropertyName("timed")] bool Timed
+) : ItemSource(Type);
+
+public record SpecialShopSource(
+    [property: JsonPropertyName("type")]       string Type,
+    [property: JsonPropertyName("currency")]   string Currency,
+    [property: JsonPropertyName("currencyId")] int CurrencyId,
+    [property: JsonPropertyName("cost")]       int Cost
+) : ItemSource(Type);
+
+public record CompanyCraftSource(
+    [property: JsonPropertyName("type")]        string Type,
+    [property: JsonPropertyName("craftName")]   string CraftName,
+    [property: JsonPropertyName("ingredients")] List<(int ItemId, string ItemName, int Qty)> Ingredients
+) : ItemSource(Type);
+
+public record ItemSourcesResponse(
+    [property: JsonPropertyName("itemId")]   int ItemId,
+    [property: JsonPropertyName("itemName")] string ItemName,
+    [property: JsonPropertyName("sources")]  List<ItemSource> Sources
+);
+
 // ── Client ────────────────────────────────────────────────────────────────────
 
 public class ApiClient : IDisposable
@@ -96,6 +155,23 @@ public class ApiClient : IDisposable
         var data = await res.Content.ReadFromJsonAsync<JsonElement>(_json);
         return JsonSerializer.Deserialize<List<CraftableItem>>(
             data.GetProperty("craftable").GetRawText(), _json) ?? [];
+    }
+
+    /// <summary>Search for items by name with pagination.</summary>
+    public async Task<ItemsPageResponse?> SearchItemsAsync(string query, int page = 1, int pageSize = 20)
+    {
+        var encoded = Uri.EscapeDataString(query);
+        var res     = await _http.GetAsync($"api/plugin/items?q={encoded}&page={page}&pageSize={pageSize}");
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<ItemsPageResponse>(_json);
+    }
+
+    /// <summary>Get all ways to obtain an item (recipes, vendors, gathering, etc).</summary>
+    public async Task<ItemSourcesResponse?> GetItemSourcesAsync(int itemId)
+    {
+        var res = await _http.GetAsync($"api/plugin/item-sources?id={itemId}");
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<ItemSourcesResponse>(_json);
     }
 
     public void Dispose() => _http.Dispose();

@@ -55,10 +55,20 @@ public class MainWindow : Window, IDisposable
     {
         if (!ImGui.BeginTabBar("##tabs")) return;
 
+        DrawSearchTab();
         DrawProjectsTab();
         DrawCraftingTab();
 
         ImGui.EndTabBar();
+    }
+
+    // ── Search tab ────────────────────────────────────────────────────────────
+
+    private void DrawSearchTab()
+    {
+        if (!ImGui.BeginTabItem("Search")) return;
+        ImGui.TextDisabled("Use the search window to browse items and their sources.");
+        ImGui.EndTabItem();
     }
 
     // ── Projects tab ──────────────────────────────────────────────────────────
