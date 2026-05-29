@@ -23,13 +23,12 @@ public static class InventoryReader
     ];
 
     /// <summary>
-    /// Read all item stacks from the player's bags.
-    /// Multiple stacks of the same item are returned as separate entries;
-    /// call AggregatedBags to merge them.
+    /// Read all item stacks from the player's bags, including the HQ flag.
+    /// Multiple stacks of the same item are returned as separate entries.
     /// </summary>
-    public static unsafe List<(int ItemId, int Qty)> ReadBags(bool includeSaddlebag = false)
+    public static unsafe List<(int ItemId, int Qty, bool Hq)> ReadBags(bool includeSaddlebag = false)
     {
-        var results = new List<(int, int)>();
+        var results = new List<(int, int, bool)>();
         var manager = InventoryManager.Instance();
         if (manager == null) return results;
 
@@ -46,7 +45,8 @@ public static class InventoryReader
             {
                 var slot = container->GetInventorySlot(i);
                 if (slot == null || slot->ItemId == 0) continue;
-                results.Add(((int)slot->ItemId, (int)slot->Quantity));
+                var hq = (slot->Flags & InventoryItem.ItemFlags.HighQuality) != 0;
+                results.Add(((int)slot->ItemId, (int)slot->Quantity, hq));
             }
         }
 
@@ -54,15 +54,33 @@ public static class InventoryReader
     }
 
     /// <summary>
-    /// Read bags and merge stacks of the same item into a single entry per itemId.
+    /// Read bags and merge stacks of the same item into a single entry per itemId
+    /// (HQ/NQ pooled). Used by the Crafting tab.
     /// </summary>
     public static Dictionary<int, int> AggregatedBags(bool includeSaddlebag = false)
     {
         var agg = new Dictionary<int, int>();
-        foreach (var (itemId, qty) in ReadBags(includeSaddlebag))
+        foreach (var (itemId, qty, _) in ReadBags(includeSaddlebag))
         {
             agg[itemId] = agg.GetValueOrDefault(itemId, 0) + qty;
         }
         return agg;
+    }
+
+    /// <summary>
+    /// Read bags aggregated by (itemId, hq) — keeps HQ and NQ stacks separate so
+    /// the cleanup classifier can price each on its correct market tier.
+    /// </summary>
+    public static List<(int Id, int Qty, bool Hq)> AggregatedForCleanup(bool includeSaddlebag = false)
+    {
+        var agg = new Dictionary<(int, bool), int>();
+        foreach (var (itemId, qty, hq) in ReadBags(includeSaddlebag))
+        {
+            var key = (itemId, hq);
+            agg[key] = agg.GetValueOrDefault(key, 0) + qty;
+        }
+        var list = new List<(int, int, bool)>();
+        foreach (var (key, qty) in agg) list.Add((key.Item1, qty, key.Item2));
+        return list;
     }
 }

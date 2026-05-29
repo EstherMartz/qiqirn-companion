@@ -160,6 +160,72 @@ public record TradingQueryResponse(
     [property: JsonPropertyName("scope")]  string                Scope
 );
 
+// ── Inventory cleanup ───────────────────────────────────────────────────────
+
+public record CleanupEntry(
+    [property: JsonPropertyName("itemId")]    int          ItemId,
+    [property: JsonPropertyName("name")]      string       Name,
+    [property: JsonPropertyName("qty")]       int          Qty,
+    [property: JsonPropertyName("isHq")]      bool         IsHq,
+    [property: JsonPropertyName("locations")] List<string>? Locations
+);
+
+public record CraftUse(
+    [property: JsonPropertyName("itemId")] int    ItemId,
+    [property: JsonPropertyName("name")]   string Name,
+    [property: JsonPropertyName("amount")] int    Amount
+);
+
+public record CraftMissing(
+    [property: JsonPropertyName("itemId")]      int    ItemId,
+    [property: JsonPropertyName("name")]        string Name,
+    [property: JsonPropertyName("amount")]      int    Amount,
+    [property: JsonPropertyName("mbUnitPrice")] double MbUnitPrice
+);
+
+public record CraftOpportunity(
+    [property: JsonPropertyName("outputItemId")]      int               OutputItemId,
+    [property: JsonPropertyName("outputName")]        string            OutputName,
+    [property: JsonPropertyName("outputUnitPrice")]   double            OutputUnitPrice,
+    [property: JsonPropertyName("netProfit")]         double            NetProfit,
+    [property: JsonPropertyName("usedFromInventory")] List<CraftUse>?    UsedFromInventory,
+    [property: JsonPropertyName("missingIngredients")]List<CraftMissing>? MissingIngredients
+);
+
+public record RunnerUp(
+    [property: JsonPropertyName("action")] string Action,
+    [property: JsonPropertyName("value")]  double Value
+);
+
+public record CleanupRow(
+    [property: JsonPropertyName("entry")]          CleanupEntry          Entry,
+    [property: JsonPropertyName("vendorRevenue")]  double                VendorRevenue,
+    [property: JsonPropertyName("mbRevenue")]      double                MbRevenue,
+    [property: JsonPropertyName("mbListingCount")] int                   MbListingCount,
+    [property: JsonPropertyName("mbScope")]        string?               MbScope,
+    [property: JsonPropertyName("bestCraft")]      CraftOpportunity?     BestCraft,
+    [property: JsonPropertyName("otherCrafts")]    List<CraftOpportunity>? OtherCrafts,
+    [property: JsonPropertyName("bucket")]         string                Bucket,
+    [property: JsonPropertyName("runnerUp")]       RunnerUp?             RunnerUp
+);
+
+public record CleanupSummary(
+    [property: JsonPropertyName("craftCount")]   int    CraftCount,
+    [property: JsonPropertyName("sellMbCount")]  int    SellMbCount,
+    [property: JsonPropertyName("vendorCount")]  int    VendorCount,
+    [property: JsonPropertyName("discardCount")] int    DiscardCount,
+    [property: JsonPropertyName("vendorTotal")]  double VendorTotal,
+    [property: JsonPropertyName("mbTotal")]      double MbTotal
+);
+
+public record CleanupResponse(
+    [property: JsonPropertyName("craft")]   List<CleanupRow> Craft,
+    [property: JsonPropertyName("sellMb")]  List<CleanupRow> SellMb,
+    [property: JsonPropertyName("vendor")]  List<CleanupRow> Vendor,
+    [property: JsonPropertyName("discard")] List<CleanupRow> Discard,
+    [property: JsonPropertyName("summary")] CleanupSummary   Summary
+);
+
 // ── Client ────────────────────────────────────────────────────────────────────
 
 public class ApiClient : IDisposable
@@ -243,6 +309,16 @@ public class ApiClient : IDisposable
         var res = await _http.GetAsync(url);
         res.EnsureSuccessStatusCode();
         return await res.Content.ReadFromJsonAsync<TradingQueryResponse>(_json);
+    }
+
+    /// <summary>Classify live inventory into craft/sell/vendor/discard buckets.</summary>
+    public async Task<CleanupResponse?> GetCleanupAsync(List<(int id, int qty, bool hq)> inv)
+    {
+        var invJson = JsonSerializer.Serialize(inv.ConvertAll(x => new { id = x.id, qty = x.qty, hq = x.hq }));
+        var encoded = Uri.EscapeDataString(invJson);
+        var res     = await _http.GetAsync($"api/plugin/cleanup?inv={encoded}");
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<CleanupResponse>(_json);
     }
 
     public void Dispose() => _http.Dispose();

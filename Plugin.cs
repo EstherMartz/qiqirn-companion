@@ -22,6 +22,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ConfigWindow  _configWindow;
     private readonly SearchWindow  _searchWindow;
     private readonly TradingWindow _tradingWindow;
+    private readonly CleanupWindow _cleanupWindow;
 
     public Plugin(
         IDalamudPluginInterface pluginInterface,
@@ -43,12 +44,14 @@ public sealed class Plugin : IDalamudPlugin
         // Windows
         _searchWindow  = new SearchWindow(_api);
         _tradingWindow = new TradingWindow(_api);
-        _mainWindow    = new MainWindow(Config, _api, playerState, _searchWindow, _tradingWindow);
+        _cleanupWindow = new CleanupWindow(_api);
+        _mainWindow    = new MainWindow(Config, _api, playerState, _searchWindow, _tradingWindow, _cleanupWindow);
         _configWindow  = new ConfigWindow(Config);
         _windowSystem.AddWindow(_mainWindow);
         _windowSystem.AddWindow(_configWindow);
         _windowSystem.AddWindow(_searchWindow);
         _windowSystem.AddWindow(_tradingWindow);
+        _windowSystem.AddWindow(_cleanupWindow);
 
         // Slash command
         _commands.AddHandler(CommandName, new CommandInfo(OnCommand)
