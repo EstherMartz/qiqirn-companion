@@ -155,10 +155,10 @@ public class TradingWindow : Window, IDisposable
                 ImGui.TextColored(new Vector4(1, 0.85f, 0.1f, 1), "HQ");
 
             ImGui.TableSetColumnIndex(2);
-            ImGui.TextUnformatted(FormatGil(row.UnitPrice));
+            ImGui.TextUnformatted(FormatGil((long)row.UnitPrice));
 
             ImGui.TableSetColumnIndex(3);
-            ImGui.TextDisabled(FormatGil(row.AveragePrice));
+            ImGui.TextDisabled(FormatGil((long)row.AveragePrice));
 
             ImGui.TableSetColumnIndex(4);
             var dealColor = row.DealPct >= 40
