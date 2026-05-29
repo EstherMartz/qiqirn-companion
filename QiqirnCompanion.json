@@ -4,7 +4,11 @@
   "Description": "Browse open FC craft projects and claim tasks directly from inside the game. Also shows what you can craft from your current inventory with current Marketboard prices.",
   "Punchline": "In-game FC project tracker and craft-from-inventory helper.",
   "Changelog": "Initial release.",
-  "Tags": [ "crafting", "inventory", "fc" ],
+  "Tags": [
+    "crafting",
+    "inventory",
+    "fc"
+  ],
   "CategoryTags": [],
   "InternalName": "QiqirnCompanion",
   "AssemblyVersion": "1.0.0.0",
