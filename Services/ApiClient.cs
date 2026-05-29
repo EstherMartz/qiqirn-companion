@@ -60,39 +60,45 @@ public abstract record ItemSource(
     [property: JsonPropertyName("type")] string Type
 );
 
+public record IngredientItem(
+    [property: JsonPropertyName("itemId")]   int    ItemId,
+    [property: JsonPropertyName("itemName")] string ItemName,
+    [property: JsonPropertyName("qty")]      int    Qty
+);
+
 public record RecipeSource(
-    [property: JsonPropertyName("type")]        string Type,
-    [property: JsonPropertyName("jobId")]       int JobId,
-    [property: JsonPropertyName("jobName")]     string JobName,
-    [property: JsonPropertyName("level")]       int Level,
-    [property: JsonPropertyName("ingredients")] List<(int ItemId, string ItemName, int Qty)> Ingredients,
-    [property: JsonPropertyName("outputQty")]   int OutputQty
+    string                               Type,
+    [property: JsonPropertyName("jobId")]       int                  JobId,
+    [property: JsonPropertyName("jobName")]     string               JobName,
+    [property: JsonPropertyName("level")]       int                  Level,
+    [property: JsonPropertyName("ingredients")] List<IngredientItem> Ingredients,
+    [property: JsonPropertyName("outputQty")]   int                  OutputQty
 ) : ItemSource(Type);
 
 public record VendorSource(
-    [property: JsonPropertyName("type")]    string Type,
-    [property: JsonPropertyName("npcId")]   int NpcId,
+    string                               Type,
+    [property: JsonPropertyName("npcId")]   int    NpcId,
     [property: JsonPropertyName("npcName")] string NpcName,
-    [property: JsonPropertyName("price")]   int Price
+    [property: JsonPropertyName("price")]   int    Price
 ) : ItemSource(Type);
 
 public record GatheringSource(
-    [property: JsonPropertyName("type")]  string Type,
-    [property: JsonPropertyName("level")] int Level,
+    string                               Type,
+    [property: JsonPropertyName("level")] int  Level,
     [property: JsonPropertyName("timed")] bool Timed
 ) : ItemSource(Type);
 
 public record SpecialShopSource(
-    [property: JsonPropertyName("type")]       string Type,
+    string                               Type,
     [property: JsonPropertyName("currency")]   string Currency,
-    [property: JsonPropertyName("currencyId")] int CurrencyId,
-    [property: JsonPropertyName("cost")]       int Cost
+    [property: JsonPropertyName("currencyId")] int    CurrencyId,
+    [property: JsonPropertyName("cost")]       int    Cost
 ) : ItemSource(Type);
 
 public record CompanyCraftSource(
-    [property: JsonPropertyName("type")]        string Type,
-    [property: JsonPropertyName("craftName")]   string CraftName,
-    [property: JsonPropertyName("ingredients")] List<(int ItemId, string ItemName, int Qty)> Ingredients
+    string                               Type,
+    [property: JsonPropertyName("craftName")]   string               CraftName,
+    [property: JsonPropertyName("ingredients")] List<IngredientItem> Ingredients
 ) : ItemSource(Type);
 
 public record ItemSourcesResponse(

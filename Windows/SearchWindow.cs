@@ -1,6 +1,5 @@
+using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
-using Dalamud.Interface.Utility.Raii;
-using ImGuiNET;
 using QiqirnCompanion.Services;
 using System;
 using System.Collections.Generic;
@@ -27,6 +26,7 @@ public class SearchWindow : Window, IDisposable
     private ItemSourcesResponse? _selectedSources = null;
     private bool _isLoadingSources = false;
     private string? _sourcesError = null;
+    private bool _sourcesModalOpen = false;
 
     public SearchWindow(ApiClient api) : base("Item Search")
     {
@@ -34,9 +34,8 @@ public class SearchWindow : Window, IDisposable
         Flags |= ImGuiWindowFlags.NoScrollbar;
         SizeConstraints = new WindowSizeConstraints
         {
-            IdealSize = new Vector2(700, 500),
-            MinSize = new Vector2(400, 300),
-            MaxSize = new Vector2(1200, 800),
+            MinimumSize = new Vector2(400, 300),
+            MaximumSize = new Vector2(1200, 800),
         };
     }
 
@@ -199,7 +198,7 @@ public class SearchWindow : Window, IDisposable
         if (_selectedItem == null) return;
 
         ImGui.SetNextWindowSize(new Vector2(600, 400), ImGuiCond.FirstUseEver);
-        if (ImGui.BeginPopupModal($"Sources: {_selectedItem.Name}##sources", ref (_selectedItem != null)))
+        if (ImGui.BeginPopupModal($"Sources: {_selectedItem.Name}##sources", ref _sourcesModalOpen))
         {
             if (_sourcesError != null)
             {
@@ -221,8 +220,9 @@ public class SearchWindow : Window, IDisposable
             ImGui.SetCursorPosX(ImGui.GetWindowWidth() - 100);
             if (ImGui.Button("Close", new Vector2(90, 0)))
             {
-                _selectedItem = null;
+                _selectedItem    = null;
                 _selectedSources = null;
+                _sourcesModalOpen = false;
                 ImGui.CloseCurrentPopup();
             }
 
@@ -268,9 +268,9 @@ public class SearchWindow : Window, IDisposable
         ImGui.Indent();
         ImGui.Text($"Yield: {recipe.OutputQty}");
         ImGui.TextColored(new Vector4(0.8f, 0.8f, 0.8f, 1), "Ingredients:");
-        foreach (var (itemId, itemName, qty) in recipe.Ingredients)
+        foreach (var ing in recipe.Ingredients)
         {
-            ImGui.BulletText($"{itemName} x{qty}");
+            ImGui.BulletText($"{ing.ItemName} x{ing.Qty}");
         }
         ImGui.Unindent();
     }
@@ -302,19 +302,20 @@ public class SearchWindow : Window, IDisposable
         ImGui.TextColored(new Vector4(1, 0.7f, 0.2f, 1), $"🏢 {companyCraft.CraftName}");
         ImGui.Indent();
         ImGui.TextColored(new Vector4(0.8f, 0.8f, 0.8f, 1), "Materials:");
-        foreach (var (itemId, itemName, qty) in companyCraft.Ingredients)
+        foreach (var ing in companyCraft.Ingredients)
         {
-            ImGui.BulletText($"{itemName} x{qty}");
+            ImGui.BulletText($"{ing.ItemName} x{ing.Qty}");
         }
         ImGui.Unindent();
     }
 
     private void SelectItem(ItemSearchResult item)
     {
-        _selectedItem = item;
-        _selectedSources = null;
+        _selectedItem     = item;
+        _selectedSources  = null;
         _isLoadingSources = true;
-        _sourcesError = null;
+        _sourcesError     = null;
+        _sourcesModalOpen = true;
         ImGui.OpenPopup($"Sources: {item.Name}##sources");
         _ = LoadItemSources(item.Id);
     }
