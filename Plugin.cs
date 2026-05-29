@@ -22,13 +22,16 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ConfigWindow  _configWindow;
     private readonly SearchWindow  _searchWindow;
     private readonly TradingWindow _tradingWindow;
+    private readonly PlannerWindow _plannerWindow;
     private readonly CleanupWindow _cleanupWindow;
+    private readonly SalesTracker  _salesTracker;
 
     public Plugin(
         IDalamudPluginInterface pluginInterface,
         ICommandManager         commandManager,
         IPlayerState            playerState,
-        IChatGui                chatGui)
+        IChatGui                chatGui,
+        IDataManager            dataManager)
     {
         _pi          = pluginInterface;
         _commands    = commandManager;
@@ -40,17 +43,20 @@ public sealed class Plugin : IDalamudPlugin
         // Services
         _api = new ApiClient(Config.ApiBaseUrl);
         ItemInteractions.Initialize(chatGui);
+        _salesTracker = new SalesTracker(chatGui, dataManager, Config);
 
         // Windows
         _searchWindow  = new SearchWindow(_api);
         _tradingWindow = new TradingWindow(_api);
+        _plannerWindow = new PlannerWindow(Config, _salesTracker);
         _cleanupWindow = new CleanupWindow(_api);
-        _mainWindow    = new MainWindow(Config, _api, playerState, _searchWindow, _tradingWindow, _cleanupWindow);
+        _mainWindow    = new MainWindow(Config, _api, playerState, _searchWindow, _tradingWindow, _plannerWindow, _cleanupWindow);
         _configWindow  = new ConfigWindow(Config);
         _windowSystem.AddWindow(_mainWindow);
         _windowSystem.AddWindow(_configWindow);
         _windowSystem.AddWindow(_searchWindow);
         _windowSystem.AddWindow(_tradingWindow);
+        _windowSystem.AddWindow(_plannerWindow);
         _windowSystem.AddWindow(_cleanupWindow);
 
         // Slash command
@@ -78,6 +84,7 @@ public sealed class Plugin : IDalamudPlugin
 
         _commands.RemoveHandler(CommandName);
         _windowSystem.RemoveAllWindows();
+        _salesTracker.Dispose();
         _api.Dispose();
     }
 }

@@ -1,5 +1,6 @@
 using Dalamud.Configuration;
 using Dalamud.Plugin;
+using QiqirnCompanion.Planner;
 using System;
 
 namespace QiqirnCompanion;
@@ -25,6 +26,12 @@ public class Configuration : IPluginConfiguration
     /// Home world name (e.g. "Phantom"). Required for home-scope trading queries.
     /// </summary>
     public string HomeWorld { get; set; } = string.Empty;
+
+    /// <summary>Standalone gil planner state (seeded on first use).</summary>
+    public PlannerData? Planner { get; set; }
+
+    /// <summary>Auto-log retainer market sales into the planner from chat.</summary>
+    public bool AutoLogRetainerSales { get; set; } = true;
 
     // Injected by Plugin.cs after loading — used to save.
     [NonSerialized]
