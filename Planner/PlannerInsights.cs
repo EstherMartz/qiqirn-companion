@@ -12,7 +12,13 @@ public static class PlannerInsights
 {
     private const double DayMs = 864e5;
 
-    public static bool IsSale(LogEntry e) => e.Source == "sale";
+    // Manual quick-log entries use this note; everything else with a real note is a sale.
+    public const string ManualNote = "Manual entry";
+
+    public static bool IsSale(LogEntry e) =>
+        e.Source == "sale"
+        // Legacy entries (logged before Source existed): a non-manual note = a sale.
+        || (e.Source == null && !string.IsNullOrEmpty(e.Note) && e.Note != ManualNote);
 
     /// <summary>Whether any lane item matches this name (case-insensitive, trimmed).</summary>
     public static bool IsOnPlan(PlannerData d, string name)
@@ -53,7 +59,7 @@ public static class PlannerInsights
         foreach (var e in d.Log)
         {
             if (!IsSale(e) || e.Ts < cutoff) continue;
-            if (string.IsNullOrWhiteSpace(e.Note)) continue;
+            if (string.IsNullOrWhiteSpace(e.Note) || e.Note == "Retainer sale") continue;
             if (IsOnPlan(d, e.Note)) continue;
             var key = e.Note.Trim().ToLowerInvariant();
             if (!agg.TryGetValue(key, out var p)) { p = new Proposal { Name = e.Note }; agg[key] = p; }
