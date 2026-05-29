@@ -3,7 +3,7 @@
     "Author": "Martz",
     "Name": "Qiqirn Companion",
     "InternalName": "QiqirnCompanion",
-    "AssemblyVersion": "1.2.1.0",
+    "AssemblyVersion": "1.2.2.0",
     "Description": "Browse open FC craft projects and claim tasks directly from inside the game. Trading queries, item search, and craft-from-inventory with live Marketboard prices.",
     "Punchline": "In-game FC project tracker, trading scanner, and craft helper.",
     "Changelog": "Initial release.",
