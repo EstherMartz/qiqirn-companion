@@ -30,6 +30,9 @@ public class Configuration : IPluginConfiguration
     /// <summary>Standalone gil planner state (seeded on first use).</summary>
     public PlannerData? Planner { get; set; }
 
+    /// <summary>Auto-log retainer market sales into the planner from chat.</summary>
+    public bool AutoLogRetainerSales { get; set; } = true;
+
     // Injected by Plugin.cs after loading — used to save.
     [NonSerialized]
     private IDalamudPluginInterface? _pluginInterface;

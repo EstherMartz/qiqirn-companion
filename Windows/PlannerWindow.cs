@@ -61,9 +61,12 @@ public class PlannerWindow : Window, IDisposable
     private readonly Dictionary<string, AddBuffer> _add = new();
     private readonly HashSet<string> _showAdd = new();
 
-    public PlannerWindow(Configuration config) : base("Gil Planner##planner")
+    private readonly SalesTracker _salesTracker;
+
+    public PlannerWindow(Configuration config, SalesTracker salesTracker) : base("Gil Planner##planner")
     {
-        _config = config;
+        _config       = config;
+        _salesTracker = salesTracker;
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(560, 400),
@@ -192,6 +195,21 @@ public class PlannerWindow : Window, IDisposable
             PlannerLogic.LogGil(d, amt);
             _logAmountBuf = "";
             Save();
+        }
+
+        // Auto-log retainer sales
+        var autoLog = _config.AutoLogRetainerSales;
+        if (ImGui.Checkbox("Auto-log retainer sales", ref autoLog))
+        {
+            _config.AutoLogRetainerSales = autoLog;
+            Save();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Logs each retainer market sale to the planner as the game reports it\n(when you collect from retainers / on login).");
+        if (_salesTracker.LastLogged is { } last)
+        {
+            ImGui.SameLine();
+            ImGui.TextColored(new Vector4(0.30f, 0.85f, 0.55f, 1f), $"↳ {last.Name} +{PlannerStats.Abbr(last.Gil)}");
         }
     }
 
