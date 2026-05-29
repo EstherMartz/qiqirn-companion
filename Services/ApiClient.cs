@@ -150,14 +150,18 @@ public record TradingQueryRow(
     [property: JsonPropertyName("gilFlow")]      double GilFlow,
     [property: JsonPropertyName("hq")]           bool   Hq,
     [property: JsonPropertyName("cheapestWorld")] string? CheapestWorld,
-    [property: JsonPropertyName("cheapestPrice")] double? CheapestPrice
+    [property: JsonPropertyName("cheapestPrice")] double? CheapestPrice,
+    [property: JsonPropertyName("materialCost")] double? MaterialCost,
+    [property: JsonPropertyName("profit")]       double? Profit,
+    [property: JsonPropertyName("gilPerDay")]    double? GilPerDay
 );
 
 public record TradingQueryResponse(
     [property: JsonPropertyName("rows")]   List<TradingQueryRow> Rows,
     [property: JsonPropertyName("total")]  int                   Total,
     [property: JsonPropertyName("preset")] string?               Preset,
-    [property: JsonPropertyName("scope")]  string                Scope
+    [property: JsonPropertyName("scope")]  string                Scope,
+    [property: JsonPropertyName("mode")]   string?               Mode
 );
 
 public record TradingPreset(

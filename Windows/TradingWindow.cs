@@ -50,6 +50,7 @@ public class TradingWindow : Window, IDisposable
     private string? _error          = null;
     private List<TradingQueryRow> _rows = [];
     private int     _totalRows      = 0;
+    private string? _lastMode       = null;   // "standard" | "craft"
 
     // Live preset list (backend-driven; starts from the fallback).
     private List<(string Id, string Label, string Category)> _presets;
@@ -159,15 +160,21 @@ public class TradingWindow : Window, IDisposable
         if (_rows.Count > 0)
             ImGui.TextDisabled($"{_rows.Count} results");
 
-        const ImGuiTableFlags flags =
-            ImGuiTableFlags.Borders     |
-            ImGuiTableFlags.RowBg       |
-            ImGuiTableFlags.ScrollY     |
-            ImGuiTableFlags.Sortable    |
-            ImGuiTableFlags.SizingFixedFit;
-
         var tableHeight = ImGui.GetContentRegionAvail().Y - ImGui.GetFrameHeightWithSpacing();
-        if (!ImGui.BeginTable("##tradingRows", 8, flags, new Vector2(0, tableHeight))) return;
+        if (_lastMode == "craft") DrawCraftTable(tableHeight);
+        else DrawStandardTable(tableHeight);
+    }
+
+    private const ImGuiTableFlags TableFlags =
+        ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY
+        | ImGuiTableFlags.Sortable | ImGuiTableFlags.SizingFixedFit;
+
+    private static readonly Vector4 JadeC    = new(0.30f, 0.85f, 0.55f, 1f);
+    private static readonly Vector4 CrimsonC = new(0.95f, 0.40f, 0.42f, 1f);
+
+    private void DrawStandardTable(float tableHeight)
+    {
+        if (!ImGui.BeginTable("##tradingRows", 8, TableFlags, new Vector2(0, tableHeight))) return;
 
         ImGui.TableSetupColumn("Item",     ImGuiTableColumnFlags.WidthStretch);
         ImGui.TableSetupColumn("HQ",       ImGuiTableColumnFlags.WidthFixed, 28);
@@ -179,7 +186,7 @@ public class TradingWindow : Window, IDisposable
         ImGui.TableSetupColumn("Cheapest", ImGuiTableColumnFlags.WidthFixed, 150);
         ImGui.TableHeadersRow();
 
-        SortIfNeeded();
+        SortStandard();
 
         foreach (var row in _rows)
         {
@@ -190,8 +197,7 @@ public class TradingWindow : Window, IDisposable
             ItemInteractions.HandleRow((uint)row.Id, row.Name, row.Hq);
 
             ImGui.TableSetColumnIndex(1);
-            if (row.Hq)
-                ImGui.TextColored(new Vector4(1, 0.85f, 0.1f, 1), "HQ");
+            if (row.Hq) ImGui.TextColored(new Vector4(1, 0.85f, 0.1f, 1), "HQ");
 
             ImGui.TableSetColumnIndex(2);
             ImGui.TextUnformatted(FormatGil((long)row.UnitPrice));
@@ -223,7 +229,53 @@ public class TradingWindow : Window, IDisposable
         ImGui.EndTable();
     }
 
-    private void SortIfNeeded()
+    private void DrawCraftTable(float tableHeight)
+    {
+        if (!ImGui.BeginTable("##craftRows", 7, TableFlags, new Vector2(0, tableHeight))) return;
+
+        ImGui.TableSetupColumn("Item",      ImGuiTableColumnFlags.WidthStretch);
+        ImGui.TableSetupColumn("HQ",        ImGuiTableColumnFlags.WidthFixed, 28);
+        ImGui.TableSetupColumn("Sale",      ImGuiTableColumnFlags.WidthFixed, 80);
+        ImGui.TableSetupColumn("Mat cost",  ImGuiTableColumnFlags.WidthFixed, 80);
+        ImGui.TableSetupColumn("Profit",    ImGuiTableColumnFlags.WidthFixed, 80);
+        ImGui.TableSetupColumn("Sales/day", ImGuiTableColumnFlags.WidthFixed, 70);
+        ImGui.TableSetupColumn("Gil/day",   ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, 90);
+        ImGui.TableHeadersRow();
+
+        SortCraft();
+
+        foreach (var row in _rows)
+        {
+            ImGui.TableNextRow();
+
+            ImGui.TableSetColumnIndex(0);
+            ImGui.Selectable(row.Name, false, ImGuiSelectableFlags.SpanAllColumns);
+            ItemInteractions.HandleRow((uint)row.Id, row.Name, row.Hq);
+
+            ImGui.TableSetColumnIndex(1);
+            if (row.Hq) ImGui.TextColored(new Vector4(1, 0.85f, 0.1f, 1), "HQ");
+
+            ImGui.TableSetColumnIndex(2);
+            ImGui.TextUnformatted(FormatGil((long)row.UnitPrice));
+
+            ImGui.TableSetColumnIndex(3);
+            ImGui.TextDisabled(FormatGil((long)(row.MaterialCost ?? 0)));
+
+            ImGui.TableSetColumnIndex(4);
+            var profit = row.Profit ?? 0;
+            ImGui.TextColored(profit > 0 ? JadeC : CrimsonC, FormatGil((long)profit));
+
+            ImGui.TableSetColumnIndex(5);
+            ImGui.TextUnformatted(row.Velocity > 0 ? row.Velocity.ToString("F1") : "—");
+
+            ImGui.TableSetColumnIndex(6);
+            ImGui.TextUnformatted(FormatGil((long)(row.GilPerDay ?? row.GilFlow)));
+        }
+
+        ImGui.EndTable();
+    }
+
+    private void SortStandard()
     {
         var specs = ImGui.TableGetSortSpecs();
         if (!specs.SpecsDirty || specs.SpecsCount == 0) return;
@@ -240,6 +292,28 @@ public class TradingWindow : Window, IDisposable
             5 => (a, b) => a.Velocity.CompareTo(b.Velocity),
             6 => (a, b) => a.GilFlow.CompareTo(b.GilFlow),
             7 => (a, b) => (a.CheapestPrice ?? double.MaxValue).CompareTo(b.CheapestPrice ?? double.MaxValue),
+            _ => (a, b) => 0,
+        };
+        _rows.Sort((a, b) => asc ? cmp(a, b) : -cmp(a, b));
+        specs.SpecsDirty = false;
+    }
+
+    private void SortCraft()
+    {
+        var specs = ImGui.TableGetSortSpecs();
+        if (!specs.SpecsDirty || specs.SpecsCount == 0) return;
+
+        var spec = specs.Specs;
+        var asc = spec.SortDirection == ImGuiSortDirection.Ascending;
+        Comparison<TradingQueryRow> cmp = spec.ColumnIndex switch
+        {
+            0 => (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
+            1 => (a, b) => a.Hq.CompareTo(b.Hq),
+            2 => (a, b) => a.UnitPrice.CompareTo(b.UnitPrice),
+            3 => (a, b) => (a.MaterialCost ?? 0).CompareTo(b.MaterialCost ?? 0),
+            4 => (a, b) => (a.Profit ?? 0).CompareTo(b.Profit ?? 0),
+            5 => (a, b) => a.Velocity.CompareTo(b.Velocity),
+            6 => (a, b) => (a.GilPerDay ?? a.GilFlow).CompareTo(b.GilPerDay ?? b.GilFlow),
             _ => (a, b) => 0,
         };
         _rows.Sort((a, b) => asc ? cmp(a, b) : -cmp(a, b));
@@ -266,6 +340,7 @@ public class TradingWindow : Window, IDisposable
                 var result = await _api.RunTradingQueryAsync(presetId, _world);
                 _rows      = result?.Rows ?? [];
                 _totalRows = result?.Total ?? 0;
+                _lastMode  = result?.Mode ?? "standard";
                 _error     = null;
             }
             catch (Exception ex)
