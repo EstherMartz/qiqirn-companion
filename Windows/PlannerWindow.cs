@@ -12,6 +12,37 @@ namespace QiqirnCompanion.Windows;
 
 public class PlannerWindow : Window, IDisposable
 {
+    // Lane accent palette (mirrors the web: gold / jade / crimson / aether).
+    private static readonly Vector4 Gold    = new(1.00f, 0.82f, 0.30f, 1f);
+    private static readonly Vector4 Jade    = new(0.30f, 0.85f, 0.55f, 1f);
+    private static readonly Vector4 Crimson = new(0.95f, 0.38f, 0.42f, 1f);
+    private static readonly Vector4 Aether  = new(0.45f, 0.70f, 1.00f, 1f);
+    private static readonly Vector4 White   = new(0.92f, 0.92f, 0.95f, 1f);
+    private static readonly Vector4 Dim     = new(0.55f, 0.55f, 0.60f, 1f);
+
+    private static Vector4 LaneColor(string lane) => lane switch
+    {
+        Lanes.Craft   => Gold,
+        Lanes.Gather  => Jade,
+        Lanes.Content => Crimson,
+        Lanes.Passive => Aether,
+        _             => White,
+    };
+
+    private static void StatChip(string label, string value, Vector4 valueColor)
+    {
+        ImGui.TextDisabled(label + ":");
+        ImGui.SameLine(0, 4);
+        ImGui.TextColored(valueColor, value);
+    }
+
+    private static void StatSep()
+    {
+        ImGui.SameLine(0, 8);
+        ImGui.TextDisabled("•");
+        ImGui.SameLine(0, 8);
+    }
+
     private readonly Configuration _config;
 
     // Goal-edit state
@@ -63,11 +94,11 @@ public class PlannerWindow : Window, IDisposable
         PlannerLogic.DailyResetIfStale(d);
 
         DrawHero(d);
-        ImGui.Separator();
+        ImGui.Spacing(); ImGui.Separator(); ImGui.Spacing();
         DrawLanes(d);
-        ImGui.Separator();
+        ImGui.Spacing(); ImGui.Separator(); ImGui.Spacing();
         DrawDailyRhythm(d);
-        ImGui.Separator();
+        ImGui.Spacing(); ImGui.Separator(); ImGui.Spacing();
         DrawLedger(d);
     }
 
@@ -83,19 +114,37 @@ public class PlannerWindow : Window, IDisposable
         var today = PlannerStats.TodaySum(d.Log);
         var netProfit = NetProfit(d);
 
-        ImGui.TextColored(new Vector4(1f, 0.85f, 0.3f, 1f),
-            $"{PlannerStats.Abbr(d.Goal.Current)}  /  {PlannerStats.Abbr(d.Goal.Target)} gil");
+        // Treasury → target headline
+        ImGui.TextColored(Gold, PlannerStats.Abbr(d.Goal.Current));
+        ImGui.SameLine(0, 6);
+        ImGui.TextDisabled("/");
+        ImGui.SameLine(0, 6);
+        ImGui.TextColored(new Vector4(0.85f, 0.85f, 0.9f, 1f), $"{PlannerStats.Abbr(d.Goal.Target)} gil");
+        if (remaining > 0)
+        {
+            ImGui.SameLine(0, 10);
+            ImGui.TextDisabled($"({PlannerStats.Abbr(remaining)} to go)");
+        }
 
+        // Gold progress bar in a darker trough
         var frac = (float)(PlannerStats.Pct(d.Goal.Current, d.Goal.Target) / 100.0);
-        ImGui.ProgressBar(frac, new Vector2(-1, 0), $"{PlannerStats.Pct(d.Goal.Current, d.Goal.Target):F1}%");
+        ImGui.PushStyleColor(ImGuiCol.PlotHistogram, Gold);
+        ImGui.PushStyleColor(ImGuiCol.FrameBg, new Vector4(0.10f, 0.10f, 0.12f, 1f));
+        ImGui.ProgressBar(frac, new Vector2(-1, 20), $"{PlannerStats.Pct(d.Goal.Current, d.Goal.Target):F1}%");
+        ImGui.PopStyleColor(2);
 
-        // Stat line
-        ImGui.TextDisabled(
-            $"Today: {PlannerStats.Abbr(today)}   " +
-            $"7-day: {PlannerStats.Abbr(week)}   " +
-            $"Rate: {PlannerStats.Abbr(rate)}/day   " +
-            $"ETA: {(etaDays.HasValue ? etaDays.Value + " days" : "—")}   " +
-            $"Net profit: {PlannerStats.Abbr(netProfit)}");
+        // Stat chips
+        ImGui.Spacing();
+        StatChip("Today", PlannerStats.Abbr(today), White);
+        StatSep();
+        StatChip("7-day", PlannerStats.Abbr(week), White);
+        StatSep();
+        StatChip("Rate", PlannerStats.Abbr(rate) + "/day", White);
+        StatSep();
+        StatChip("ETA", etaDays.HasValue ? etaDays.Value + " days" : "—", etaDays.HasValue ? Jade : Dim);
+        StatSep();
+        StatChip("Net profit", PlannerStats.Abbr(netProfit), netProfit >= 0 ? Jade : Crimson);
+        ImGui.Spacing();
 
         // Actions row
         if (ImGui.Button("Use game gil"))
@@ -165,8 +214,10 @@ public class PlannerWindow : Window, IDisposable
             var (nm, desc) = Lanes.Meta(lane);
             if (!d.Lanes.TryGetValue(lane, out var items)) { items = new(); d.Lanes[lane] = items; }
 
-            if (!ImGui.CollapsingHeader($"{nm}  ({items.Count})##lane{lane}", ImGuiTreeNodeFlags.DefaultOpen))
-                continue;
+            ImGui.PushStyleColor(ImGuiCol.Text, LaneColor(lane));
+            var open = ImGui.CollapsingHeader($"●  {nm}  ({items.Count})##lane{lane}", ImGuiTreeNodeFlags.DefaultOpen);
+            ImGui.PopStyleColor();
+            if (!open) continue;
 
             ImGui.TextDisabled(desc);
             DrawLaneTable(d, lane, items);
@@ -229,13 +280,20 @@ public class PlannerWindow : Window, IDisposable
             ImGui.TextUnformatted(it.Units.ToString());
 
             ImGui.TableSetColumnIndex(6);
-            ImGui.TextUnformatted(PlannerStats.Abbr(it.Earned));
+            if (it.Earned > 0) ImGui.TextColored(Jade, PlannerStats.Abbr(it.Earned));
+            else ImGui.TextDisabled("—");
 
             ImGui.TableSetColumnIndex(7);
-            if (ImGui.SmallButton("+")) { PlannerLogic.RecordSale(d, lane, it.Id); Save(); }
+            ImGui.PushStyleColor(ImGuiCol.Text, Jade);
+            var sell = ImGui.SmallButton("+");
+            ImGui.PopStyleColor();
+            if (sell) { PlannerLogic.RecordSale(d, lane, it.Id); Save(); }
             if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Record a sale (+{PlannerStats.Abbr(it.Price)} gil)");
             ImGui.SameLine();
-            if (ImGui.SmallButton("-")) { PlannerLogic.ReverseSale(d, lane, it.Id); Save(); }
+            ImGui.PushStyleColor(ImGuiCol.Text, Crimson);
+            var undo = ImGui.SmallButton("-");
+            ImGui.PopStyleColor();
+            if (undo) { PlannerLogic.ReverseSale(d, lane, it.Id); Save(); }
             if (ImGui.IsItemHovered()) ImGui.SetTooltip("Undo last sale");
             ImGui.SameLine();
             if (ImGui.SmallButton("x")) removeId = it.Id;
