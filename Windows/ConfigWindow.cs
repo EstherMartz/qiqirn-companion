@@ -12,18 +12,20 @@ public class ConfigWindow : Window
     private string _guildIdBuf;
     private string _apiBaseUrlBuf;
     private string _charOverrideBuf;
+    private string _homeWorldBuf;
 
     public ConfigWindow(Configuration config)
         : base("Qiqirn Companion — Config##config",
                ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoScrollbar)
     {
         _config = config;
-        Size    = new Vector2(440, 220);
+        Size    = new Vector2(440, 255);
         SizeCondition = ImGuiCond.Always;
 
         _guildIdBuf      = config.GuildId;
         _apiBaseUrlBuf   = config.ApiBaseUrl;
         _charOverrideBuf = config.CharacterNameOverride;
+        _homeWorldBuf    = config.HomeWorld;
     }
 
     public override void OnOpen()
@@ -32,6 +34,7 @@ public class ConfigWindow : Window
         _guildIdBuf      = _config.GuildId;
         _apiBaseUrlBuf   = _config.ApiBaseUrl;
         _charOverrideBuf = _config.CharacterNameOverride;
+        _homeWorldBuf    = _config.HomeWorld;
     }
 
     public override void Draw()
@@ -59,6 +62,13 @@ public class ConfigWindow : Window
             ImGui.SetTooltip("Leave empty to use your logged-in character name automatically.");
 
         ImGui.Spacing();
+
+        ImGui.SetNextItemWidth(260);
+        ImGui.InputText("Home World##world", ref _homeWorldBuf, 32);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Your home world (e.g. Phantom). Required for home-scope trading presets\n(Out of Stock, Reposts, Craft-flip).");
+
+        ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
 
@@ -69,6 +79,7 @@ public class ConfigWindow : Window
                                               ? "https://qiqirn.tools"
                                               : _apiBaseUrlBuf.Trim();
             _config.CharacterNameOverride = _charOverrideBuf.Trim();
+            _config.HomeWorld             = _homeWorldBuf.Trim();
             _config.Save();
             IsOpen = false;
         }

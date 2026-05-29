@@ -107,6 +107,25 @@ public record ItemSourcesResponse(
     [property: JsonPropertyName("sources")]  List<ItemSource> Sources
 );
 
+public record TradingQueryRow(
+    [property: JsonPropertyName("id")]           int    Id,
+    [property: JsonPropertyName("name")]         string Name,
+    [property: JsonPropertyName("sc")]           int    Sc,
+    [property: JsonPropertyName("unitPrice")]    int    UnitPrice,
+    [property: JsonPropertyName("averagePrice")] int    AveragePrice,
+    [property: JsonPropertyName("dealPct")]      int    DealPct,
+    [property: JsonPropertyName("velocity")]     double Velocity,
+    [property: JsonPropertyName("gilFlow")]      double GilFlow,
+    [property: JsonPropertyName("hq")]           bool   Hq
+);
+
+public record TradingQueryResponse(
+    [property: JsonPropertyName("rows")]   List<TradingQueryRow> Rows,
+    [property: JsonPropertyName("total")]  int                   Total,
+    [property: JsonPropertyName("preset")] string?               Preset,
+    [property: JsonPropertyName("scope")]  string                Scope
+);
+
 // ── Client ────────────────────────────────────────────────────────────────────
 
 public class ApiClient : IDisposable
@@ -178,6 +197,17 @@ public class ApiClient : IDisposable
         var res = await _http.GetAsync($"api/plugin/item-sources?id={itemId}");
         res.EnsureSuccessStatusCode();
         return await res.Content.ReadFromJsonAsync<ItemSourcesResponse>(_json);
+    }
+
+    /// <summary>Run a trading query preset and return market opportunity rows.</summary>
+    public async Task<TradingQueryResponse?> RunTradingQueryAsync(string presetId, string? world = null)
+    {
+        var url = $"api/plugin/trading/query?preset={Uri.EscapeDataString(presetId)}";
+        if (!string.IsNullOrEmpty(world))
+            url += $"&world={Uri.EscapeDataString(world)}";
+        var res = await _http.GetAsync(url);
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<TradingQueryResponse>(_json);
     }
 
     public void Dispose() => _http.Dispose();

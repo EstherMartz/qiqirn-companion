@@ -21,6 +21,11 @@ public class Configuration : IPluginConfiguration
     /// </summary>
     public string CharacterNameOverride { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Home world name (e.g. "Phantom"). Required for home-scope trading queries.
+    /// </summary>
+    public string HomeWorld { get; set; } = string.Empty;
+
     // Injected by Plugin.cs after loading — used to save.
     [NonSerialized]
     private IDalamudPluginInterface? _pluginInterface;

@@ -15,6 +15,7 @@ public class MainWindow : Window, IDisposable
     private readonly ApiClient     _api;
     private readonly IPlayerState  _playerState;
     private readonly SearchWindow  _searchWindow;
+    private readonly TradingWindow _tradingWindow;
 
     // ── Projects tab state ────────────────────────────────────────────────────
     private List<ApiProject>    _projects            = [];
@@ -32,13 +33,14 @@ public class MainWindow : Window, IDisposable
     private bool                _includeSaddlebag = false;
     private bool                _craftScanned     = false;
 
-    public MainWindow(Configuration config, ApiClient api, IPlayerState playerState, SearchWindow searchWindow)
+    public MainWindow(Configuration config, ApiClient api, IPlayerState playerState, SearchWindow searchWindow, TradingWindow tradingWindow)
         : base("Qiqirn Companion##main", ImGuiWindowFlags.None)
     {
-        _config       = config;
-        _api          = api;
-        _playerState  = playerState;
-        _searchWindow = searchWindow;
+        _config        = config;
+        _api           = api;
+        _playerState   = playerState;
+        _searchWindow  = searchWindow;
+        _tradingWindow = tradingWindow;
 
         SizeConstraints = new WindowSizeConstraints
         {
@@ -58,11 +60,28 @@ public class MainWindow : Window, IDisposable
     {
         if (!ImGui.BeginTabBar("##tabs")) return;
 
+        DrawTradingTab();
         DrawSearchTab();
         DrawProjectsTab();
         DrawCraftingTab();
 
         ImGui.EndTabBar();
+    }
+
+    private void DrawTradingTab()
+    {
+        if (!ImGui.BeginTabItem("Trading")) return;
+        // Pass world to trading window so home-scope presets work
+        _tradingWindow.SetWorld(!string.IsNullOrEmpty(_playerState.CharacterName) ? GetWorldName() : null);
+        _tradingWindow.DrawContent();
+        ImGui.EndTabItem();
+    }
+
+    private string? GetWorldName()
+    {
+        // IPlayerState doesn't expose world directly; config allows overriding.
+        // Return null until user sets it — DC-scope presets still work without it.
+        return _config.HomeWorld;
     }
 
     // ── Search tab ────────────────────────────────────────────────────────────
