@@ -235,25 +235,34 @@ public class PlannerWindow : Window, IDisposable
         }
     }
 
+    // Profit per day = (price − cost) × estimated units/day. The "what's worth doing" metric.
+    private static double ProfitPerDay(PlanItem it) => (it.Price - it.Cost) * it.PerDay;
+
     private void DrawLaneTable(PlannerData d, string lane, List<PlanItem> items)
     {
         if (items.Count == 0) { ImGui.TextDisabled("  (no items)"); return; }
 
-        const ImGuiTableFlags flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit;
-        if (!ImGui.BeginTable($"##lanetbl{lane}", 8, flags)) return;
+        const ImGuiTableFlags flags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg
+            | ImGuiTableFlags.Sortable | ImGuiTableFlags.SizingFixedFit;
+        if (!ImGui.BeginTable($"##lanetbl{lane}", 10, flags)) return;
 
-        ImGui.TableSetupColumn("On",     ImGuiTableColumnFlags.WidthFixed, 28);
+        ImGui.TableSetupColumn("On",     ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 28);
         ImGui.TableSetupColumn("Item",   ImGuiTableColumnFlags.WidthStretch);
-        ImGui.TableSetupColumn("Price",  ImGuiTableColumnFlags.WidthFixed, 70);
-        ImGui.TableSetupColumn("/day",   ImGuiTableColumnFlags.WidthFixed, 50);
+        ImGui.TableSetupColumn("Price",  ImGuiTableColumnFlags.WidthFixed, 65);
+        ImGui.TableSetupColumn("Cost",   ImGuiTableColumnFlags.WidthFixed, 60);
+        ImGui.TableSetupColumn("/day",   ImGuiTableColumnFlags.WidthFixed, 48);
+        ImGui.TableSetupColumn("Profit/day", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort | ImGuiTableColumnFlags.PreferSortDescending, 90);
         ImGui.TableSetupColumn("Supply", ImGuiTableColumnFlags.WidthFixed, 55);
-        ImGui.TableSetupColumn("Sold",   ImGuiTableColumnFlags.WidthFixed, 70);
-        ImGui.TableSetupColumn("Earned", ImGuiTableColumnFlags.WidthFixed, 70);
-        ImGui.TableSetupColumn("",       ImGuiTableColumnFlags.WidthFixed, 90);
+        ImGui.TableSetupColumn("Sold",   ImGuiTableColumnFlags.WidthFixed, 50);
+        ImGui.TableSetupColumn("Earned", ImGuiTableColumnFlags.WidthFixed, 65);
+        ImGui.TableSetupColumn("",       ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 90);
         ImGui.TableHeadersRow();
 
+        // Sort a display copy so the saved plan order is never mutated.
+        var view = SortedView(items);
+
         string? removeId = null;
-        foreach (var it in items)
+        foreach (var it in view)
         {
             ImGui.TableNextRow();
             ImGui.PushID(it.Id);
@@ -265,25 +274,33 @@ public class PlannerWindow : Window, IDisposable
             ImGui.TableSetColumnIndex(1);
             if (it.Active) ImGui.TextUnformatted(it.Name);
             else ImGui.TextDisabled(it.Name);
-            if (!string.IsNullOrEmpty(it.Src)) ImGui.TextDisabled($"  {it.Src}");
+            if (!string.IsNullOrEmpty(it.Src)) { ImGui.SameLine(0, 6); ImGui.TextDisabled(it.Src); }
 
             ImGui.TableSetColumnIndex(2);
             ImGui.TextUnformatted(PlannerStats.Abbr(it.Price));
 
             ImGui.TableSetColumnIndex(3);
-            ImGui.TextUnformatted(it.PerDay.ToString("0.#", CultureInfo.InvariantCulture));
+            if (it.Cost > 0) ImGui.TextDisabled(PlannerStats.Abbr(it.Cost));
+            else ImGui.TextDisabled("—");
 
             ImGui.TableSetColumnIndex(4);
-            DrawSupply(it.Supply);
+            ImGui.TextUnformatted(it.PerDay.ToString("0.#", CultureInfo.InvariantCulture));
 
             ImGui.TableSetColumnIndex(5);
-            ImGui.TextUnformatted(it.Units.ToString());
+            var ppd = ProfitPerDay(it);
+            ImGui.TextColored(ppd > 0 ? Jade : Dim, PlannerStats.Abbr(ppd));
 
             ImGui.TableSetColumnIndex(6);
+            DrawSupply(it.Supply);
+
+            ImGui.TableSetColumnIndex(7);
+            ImGui.TextUnformatted(it.Units.ToString());
+
+            ImGui.TableSetColumnIndex(8);
             if (it.Earned > 0) ImGui.TextColored(Jade, PlannerStats.Abbr(it.Earned));
             else ImGui.TextDisabled("—");
 
-            ImGui.TableSetColumnIndex(7);
+            ImGui.TableSetColumnIndex(9);
             ImGui.PushStyleColor(ImGuiCol.Text, Jade);
             var sell = ImGui.SmallButton("+");
             ImGui.PopStyleColor();
@@ -305,6 +322,30 @@ public class PlannerWindow : Window, IDisposable
         ImGui.EndTable();
 
         if (removeId != null) { PlannerLogic.RemoveItem(d, lane, removeId); Save(); }
+    }
+
+    // Returns items ordered by the table's current sort spec (display-only copy).
+    private static List<PlanItem> SortedView(List<PlanItem> items)
+    {
+        var specs = ImGui.TableGetSortSpecs();
+        if (specs.SpecsCount == 0) return items;
+        var spec = specs.Specs;
+        var asc = spec.SortDirection == ImGuiSortDirection.Ascending;
+        Comparison<PlanItem> cmp = spec.ColumnIndex switch
+        {
+            1 => (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
+            2 => (a, b) => a.Price.CompareTo(b.Price),
+            3 => (a, b) => a.Cost.CompareTo(b.Cost),
+            4 => (a, b) => a.PerDay.CompareTo(b.PerDay),
+            5 => (a, b) => ProfitPerDay(a).CompareTo(ProfitPerDay(b)),
+            6 => (a, b) => (a.Supply ?? double.MaxValue).CompareTo(b.Supply ?? double.MaxValue),
+            7 => (a, b) => a.Units.CompareTo(b.Units),
+            8 => (a, b) => a.Earned.CompareTo(b.Earned),
+            _ => (a, b) => 0,
+        };
+        var copy = new List<PlanItem>(items);
+        copy.Sort((a, b) => asc ? cmp(a, b) : -cmp(a, b));
+        return copy;
     }
 
     private static void DrawSupply(double? supply)
