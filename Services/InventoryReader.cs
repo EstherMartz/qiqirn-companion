@@ -12,6 +12,7 @@ public static class InventoryReader
         InventoryType.Inventory2,
         InventoryType.Inventory3,
         InventoryType.Inventory4,
+        InventoryType.Crystals,   // crystals/shards — required by every recipe
     ];
 
     // Chocobo saddlebag (optional).
