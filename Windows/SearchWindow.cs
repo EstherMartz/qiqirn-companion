@@ -39,7 +39,9 @@ public class SearchWindow : Window, IDisposable
         };
     }
 
-    public override void Draw()
+    public override void Draw() => DrawContent();
+
+    public void DrawContent()
     {
         DrawSearchBar();
         ImGui.Separator();

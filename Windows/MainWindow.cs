@@ -14,6 +14,7 @@ public class MainWindow : Window, IDisposable
     private readonly Configuration _config;
     private readonly ApiClient     _api;
     private readonly IPlayerState  _playerState;
+    private readonly SearchWindow  _searchWindow;
 
     // ── Projects tab state ────────────────────────────────────────────────────
     private List<ApiProject>    _projects            = [];
@@ -25,17 +26,19 @@ public class MainWindow : Window, IDisposable
     private string              _claimError          = string.Empty;
 
     // ── Crafting tab state ────────────────────────────────────────────────────
-    private List<CraftableItem> _craftable       = [];
-    private bool                _craftLoading    = false;
-    private string              _craftError      = string.Empty;
+    private List<CraftableItem> _craftable        = [];
+    private bool                _craftLoading     = false;
+    private string              _craftError       = string.Empty;
     private bool                _includeSaddlebag = false;
+    private bool                _craftScanned     = false;
 
-    public MainWindow(Configuration config, ApiClient api, IPlayerState playerState)
+    public MainWindow(Configuration config, ApiClient api, IPlayerState playerState, SearchWindow searchWindow)
         : base("Qiqirn Companion##main", ImGuiWindowFlags.None)
     {
-        _config      = config;
-        _api         = api;
-        _playerState = playerState;
+        _config       = config;
+        _api          = api;
+        _playerState  = playerState;
+        _searchWindow = searchWindow;
 
         SizeConstraints = new WindowSizeConstraints
         {
@@ -67,7 +70,7 @@ public class MainWindow : Window, IDisposable
     private void DrawSearchTab()
     {
         if (!ImGui.BeginTabItem("Search")) return;
-        ImGui.TextDisabled("Use the search window to browse items and their sources.");
+        _searchWindow.DrawContent();
         ImGui.EndTabItem();
     }
 
@@ -208,8 +211,12 @@ public class MainWindow : Window, IDisposable
 
         ImGui.Separator();
 
-        if (_craftable.Count == 0 && !_craftLoading)
-            ImGui.TextDisabled("Click 'Scan Inventory' to see what you can craft.");
+        if (_craftable.Count == 0 && !_craftLoading && string.IsNullOrEmpty(_craftError))
+        {
+            ImGui.TextDisabled(_craftScanned
+                ? "No craftable items found. Try including Saddlebag or check your inventory."
+                : "Click 'Scan Inventory' to see what you can craft.");
+        }
         else
             DrawCraftableTable();
 
@@ -384,6 +391,7 @@ public class MainWindow : Window, IDisposable
             finally
             {
                 _craftLoading = false;
+                _craftScanned = true;
             }
         });
     }

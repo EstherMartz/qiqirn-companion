@@ -38,9 +38,9 @@ public sealed class Plugin : IDalamudPlugin
         _api = new ApiClient(Config.ApiBaseUrl);
 
         // Windows
-        _mainWindow   = new MainWindow(Config, _api, playerState);
-        _configWindow = new ConfigWindow(Config);
         _searchWindow = new SearchWindow(_api);
+        _mainWindow   = new MainWindow(Config, _api, playerState, _searchWindow);
+        _configWindow = new ConfigWindow(Config);
         _windowSystem.AddWindow(_mainWindow);
         _windowSystem.AddWindow(_configWindow);
         _windowSystem.AddWindow(_searchWindow);
