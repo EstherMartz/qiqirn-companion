@@ -56,7 +56,7 @@ public sealed class SalesTracker : IDisposable
 
         var data = _config.Planner ??= SeedPlanner.CreateDefault();
         var plannerId = MatchPlanItem(data, name);
-        PlannerLogic.LogGil(data, gil, plannerId, string.IsNullOrEmpty(name) ? "Retainer sale" : name);
+        PlannerLogic.LogGil(data, gil, plannerId, string.IsNullOrEmpty(name) ? "Retainer sale" : name, source: "sale");
         _config.Save();
 
         LastLogged = (string.IsNullOrEmpty(name) ? "(item)" : name, gil);

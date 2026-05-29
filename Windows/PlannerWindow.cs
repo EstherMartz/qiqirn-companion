@@ -61,6 +61,12 @@ public class PlannerWindow : Window, IDisposable
     private readonly Dictionary<string, AddBuffer> _add = new();
     private readonly HashSet<string> _showAdd = new();
 
+    // Sales-insights frame state
+    private Dictionary<string, int> _saleCounts = new();        // item name (lower) → recent sale count
+    private readonly Dictionary<string, int> _proposalLane = new(); // proposal name → lane index
+    private const int ProposalWindowDays = 14;
+    private static readonly string[] LaneLabels = { "Craft", "Gather", "Content", "Passive" };
+
     private readonly SalesTracker _salesTracker;
 
     public PlannerWindow(Configuration config, SalesTracker salesTracker) : base("Gil Planner##planner")
@@ -95,8 +101,11 @@ public class PlannerWindow : Window, IDisposable
     {
         var d = Data;
         PlannerLogic.DailyResetIfStale(d);
+        _saleCounts = PlannerInsights.RecentSaleCountByItem(d, 14);
 
         DrawHero(d);
+        ImGui.Spacing(); ImGui.Separator(); ImGui.Spacing();
+        DrawSalesInsights(d);
         ImGui.Spacing(); ImGui.Separator(); ImGui.Spacing();
         DrawLanes(d);
         ImGui.Spacing(); ImGui.Separator(); ImGui.Spacing();
@@ -213,6 +222,89 @@ public class PlannerWindow : Window, IDisposable
         }
     }
 
+    // ── Sales insights ────────────────────────────────────────────────────
+
+    private static readonly Vector4 Green = new(0.30f, 0.85f, 0.55f, 1f);
+
+    private void DrawSalesInsights(PlannerData d)
+    {
+        var today = PlannerStats.TodaySum(d.Log);
+        ImGui.TextColored(Green, "Recent Sales");
+        ImGui.SameLine();
+        ImGui.TextDisabled($"· today {PlannerStats.Abbr(today)} gil");
+
+        var recent = PlannerInsights.RecentSales(d, 8);
+        if (recent.Count == 0)
+        {
+            ImGui.TextDisabled("No sales logged yet — retainer sales appear here automatically.");
+        }
+        else if (ImGui.BeginTable("##recentSales", 3,
+                     ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
+        {
+            ImGui.TableSetupColumn("Item",  ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Gil",   ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("When",  ImGuiTableColumnFlags.WidthFixed, 110);
+            ImGui.TableHeadersRow();
+            foreach (var e in recent)
+            {
+                ImGui.TableNextRow();
+                ImGui.TableSetColumnIndex(0);
+                ImGui.TextUnformatted(e.Note);
+                ImGui.TableSetColumnIndex(1);
+                ImGui.TextColored(Green, PlannerStats.Abbr(e.Amount));
+                ImGui.TableSetColumnIndex(2);
+                var when = DateTimeOffset.FromUnixTimeMilliseconds(e.Ts).LocalDateTime;
+                ImGui.TextDisabled(when.ToString("MM-dd HH:mm", CultureInfo.InvariantCulture));
+            }
+            ImGui.EndTable();
+        }
+
+        // Proposals from items that sold but aren't on the plan.
+        var proposals = PlannerInsights.Proposals(d, ProposalWindowDays);
+        ImGui.Spacing();
+        ImGui.TextColored(new Vector4(1f, 0.82f, 0.30f, 1f), "Selling well → add to plan");
+        ImGui.SameLine();
+        ImGui.TextDisabled($"· last {ProposalWindowDays} days");
+
+        if (proposals.Count == 0)
+        {
+            ImGui.TextDisabled("Items you sell that aren't on your plan will be suggested here.");
+            return;
+        }
+
+        foreach (var p in proposals)
+        {
+            ImGui.PushID($"prop_{p.Name}");
+            ImGui.TextUnformatted(p.Name);
+            ImGui.SameLine();
+            ImGui.TextDisabled($"— {p.Count}× · {PlannerStats.Abbr(p.Total)} ({PlannerStats.Abbr(p.Avg)}/ea)");
+
+            ImGui.SameLine();
+            if (!_proposalLane.TryGetValue(p.Name, out var laneIdx)) laneIdx = 0;
+            ImGui.SetNextItemWidth(95);
+            if (ImGui.Combo("##lane", ref laneIdx, LaneLabels, LaneLabels.Length))
+                _proposalLane[p.Name] = laneIdx;
+
+            ImGui.SameLine();
+            if (ImGui.SmallButton("+ Add"))
+            {
+                var lane = Lanes.Order[Math.Clamp(laneIdx, 0, Lanes.Order.Length - 1)];
+                PlannerLogic.AddItem(d, lane, new PlanItem
+                {
+                    Name   = p.Name,
+                    Src    = "from sales",
+                    Price  = p.Avg,
+                    Cost   = 0,
+                    PerDay = Math.Round(p.Count / (double)ProposalWindowDays, 1),
+                    Supply = null,
+                });
+                Save();
+                _proposalLane.Remove(p.Name);
+            }
+            ImGui.PopID();
+        }
+    }
+
     private static long NetProfit(PlannerData d)
     {
         long net = 0;
@@ -293,6 +385,13 @@ public class PlannerWindow : Window, IDisposable
             if (it.Active) ImGui.TextUnformatted(it.Name);
             else ImGui.TextDisabled(it.Name);
             if (!string.IsNullOrEmpty(it.Src)) { ImGui.SameLine(0, 6); ImGui.TextDisabled(it.Src); }
+            // "idle" hint: there are recent sales overall but none for this item.
+            if (_saleCounts.Count > 0 && !_saleCounts.ContainsKey(it.Name.Trim().ToLowerInvariant()))
+            {
+                ImGui.SameLine(0, 6);
+                ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.4f, 1f), "· idle");
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip($"No sales in the last {ProposalWindowDays} days.");
+            }
 
             ImGui.TableSetColumnIndex(2);
             ImGui.TextUnformatted(PlannerStats.Abbr(it.Price));

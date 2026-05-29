@@ -25,7 +25,7 @@ public static class PlannerLogic
         => Lane(d, lane).Find(x => x.Id == itemId);
 
     /// <summary>Log gil to the treasury, optionally tagged to a plan item.</summary>
-    public static void LogGil(PlannerData d, long amount, string? itemId = null, string? note = null)
+    public static void LogGil(PlannerData d, long amount, string? itemId = null, string? note = null, string source = "manual")
     {
         if (amount == 0) return;
         var noteText = note ?? "Manual entry";
@@ -38,7 +38,7 @@ public static class PlannerLogic
             }
         }
         d.Goal.Current = Math.Max(0, d.Goal.Current + amount);
-        d.Log.Add(new LogEntry { Ts = PlannerStats.NowMs(), Amount = amount, Note = noteText, ItemId = itemId });
+        d.Log.Add(new LogEntry { Ts = PlannerStats.NowMs(), Amount = amount, Note = noteText, ItemId = itemId, Source = source });
     }
 
     /// <summary>Record one sale of a lane item at its unit price.</summary>
@@ -49,7 +49,7 @@ public static class PlannerLogic
         it.Units += 1;
         it.Earned += it.Price;
         d.Goal.Current += it.Price;
-        d.Log.Add(new LogEntry { Ts = PlannerStats.NowMs(), Amount = it.Price, Note = $"{it.Name} (sale)", ItemId = itemId });
+        d.Log.Add(new LogEntry { Ts = PlannerStats.NowMs(), Amount = it.Price, Note = it.Name, ItemId = itemId, Source = "sale" });
     }
 
     /// <summary>Undo the most recent recorded sale for an item.</summary>

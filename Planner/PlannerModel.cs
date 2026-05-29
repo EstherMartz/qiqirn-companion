@@ -44,6 +44,8 @@ public class LogEntry
     public long    Amount { get; set; }
     public string  Note   { get; set; } = "";
     public string? ItemId { get; set; }
+    /// <summary>"sale" (retainer/market sale) or "manual"; null on legacy entries = manual.</summary>
+    public string? Source { get; set; }
 }
 
 public class Goal
