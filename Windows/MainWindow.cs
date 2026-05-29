@@ -45,7 +45,7 @@ public class MainWindow : Window, IDisposable
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(460, 320),
-            MaximumSize = new Vector2(900, 700),
+            MaximumSize = new Vector2(2200, 1400),
         };
     }
 

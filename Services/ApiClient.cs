@@ -19,27 +19,50 @@ public record ApiProject(
     [property: JsonPropertyName("targetQty")]    int    TargetQty
 );
 
+public record TaskMeta(
+    [property: JsonPropertyName("partKey")]    string? PartKey,
+    [property: JsonPropertyName("phaseIndex")] int?    PhaseIndex,
+    [property: JsonPropertyName("job")]        string? Job,
+    [property: JsonPropertyName("world")]      string? World
+);
+
 public record ApiTask(
-    [property: JsonPropertyName("id")]           int     Id,
-    [property: JsonPropertyName("itemName")]     string  ItemName,
-    [property: JsonPropertyName("qtyNeeded")]    int     QtyNeeded,
-    [property: JsonPropertyName("qtyDone")]      int     QtyDone,
-    [property: JsonPropertyName("status")]       string  Status,
-    [property: JsonPropertyName("assigneeId")]   string? AssigneeId,
-    [property: JsonPropertyName("assigneeName")] string? AssigneeName
+    [property: JsonPropertyName("id")]           int      Id,
+    [property: JsonPropertyName("itemId")]       int      ItemId,
+    [property: JsonPropertyName("itemName")]     string   ItemName,
+    [property: JsonPropertyName("qtyNeeded")]    int      QtyNeeded,
+    [property: JsonPropertyName("qtyDone")]      int      QtyDone,
+    [property: JsonPropertyName("status")]       string   Status,
+    [property: JsonPropertyName("source")]       string?  Source,
+    [property: JsonPropertyName("meta")]         TaskMeta? Meta,
+    [property: JsonPropertyName("assigneeId")]   string?  AssigneeId,
+    [property: JsonPropertyName("assigneeName")] string?  AssigneeName
 );
 
 public record ApiProjectDetail(
-    [property: JsonPropertyName("project")] ApiProject      Project,
-    [property: JsonPropertyName("tasks")]   List<ApiTask>   Tasks
+    [property: JsonPropertyName("project")]   ApiProject                 Project,
+    [property: JsonPropertyName("tasks")]     List<ApiTask>              Tasks,
+    [property: JsonPropertyName("userNames")] Dictionary<string, string>? UserNames
+);
+
+public record CraftIngredient(
+    [property: JsonPropertyName("itemId")] int    ItemId,
+    [property: JsonPropertyName("name")]   string Name,
+    [property: JsonPropertyName("needed")] int    Needed,
+    [property: JsonPropertyName("have")]   int    Have
 );
 
 public record CraftableItem(
-    [property: JsonPropertyName("itemId")]   int    ItemId,
-    [property: JsonPropertyName("name")]     string Name,
-    [property: JsonPropertyName("qty")]      int    Qty,
-    [property: JsonPropertyName("minNQ")]    int?   MinNQ,
-    [property: JsonPropertyName("velocity")] double Velocity
+    [property: JsonPropertyName("itemId")]        int    ItemId,
+    [property: JsonPropertyName("name")]          string Name,
+    [property: JsonPropertyName("qty")]           int    Qty,
+    [property: JsonPropertyName("missingCount")]  int    MissingCount,
+    [property: JsonPropertyName("completeness")]  double Completeness,
+    [property: JsonPropertyName("minNQ")]         int?   MinNQ,
+    [property: JsonPropertyName("velocity")]      double Velocity,
+    [property: JsonPropertyName("cheapestWorld")] string? CheapestWorld,
+    [property: JsonPropertyName("cheapestPrice")] int?   CheapestPrice,
+    [property: JsonPropertyName("ingredients")]   List<CraftIngredient>? Ingredients
 );
 
 public record ItemSearchResult(
@@ -101,10 +124,19 @@ public record CompanyCraftSource(
     [property: JsonPropertyName("ingredients")] List<IngredientItem> Ingredients
 ) : ItemSource(Type);
 
+public record MarketSummary(
+    [property: JsonPropertyName("velocity")]      double  Velocity,
+    [property: JsonPropertyName("listingCount")]  int     ListingCount,
+    [property: JsonPropertyName("minNQ")]         int?    MinNQ,
+    [property: JsonPropertyName("cheapestWorld")] string? CheapestWorld,
+    [property: JsonPropertyName("cheapestPrice")] int?    CheapestPrice
+);
+
 public record ItemSourcesResponse(
     [property: JsonPropertyName("itemId")]   int ItemId,
     [property: JsonPropertyName("itemName")] string ItemName,
-    [property: JsonPropertyName("sources")]  List<ItemSource> Sources
+    [property: JsonPropertyName("sources")]  List<ItemSource> Sources,
+    [property: JsonPropertyName("market")]   MarketSummary? Market
 );
 
 public record TradingQueryRow(
@@ -116,7 +148,9 @@ public record TradingQueryRow(
     [property: JsonPropertyName("dealPct")]      int    DealPct,
     [property: JsonPropertyName("velocity")]     double Velocity,
     [property: JsonPropertyName("gilFlow")]      double GilFlow,
-    [property: JsonPropertyName("hq")]           bool   Hq
+    [property: JsonPropertyName("hq")]           bool   Hq,
+    [property: JsonPropertyName("cheapestWorld")] string? CheapestWorld,
+    [property: JsonPropertyName("cheapestPrice")] double? CheapestPrice
 );
 
 public record TradingQueryResponse(
@@ -170,12 +204,13 @@ public class ApiClient : IDisposable
         return JsonSerializer.Deserialize<ApiTask>(data.GetProperty("task").GetRawText(), _json);
     }
 
-    /// <summary>Get craftable items for a given inventory (list of itemId + qty pairs).</summary>
-    public async Task<List<CraftableItem>> GetCraftableAsync(List<(int id, int qty)> inv)
+    /// <summary>Get craftable items for a given inventory (list of itemId + qty pairs).
+    /// maxMissing &gt; 0 also returns near-complete crafts missing up to N ingredient types.</summary>
+    public async Task<List<CraftableItem>> GetCraftableAsync(List<(int id, int qty)> inv, int maxMissing = 0)
     {
         var invJson = JsonSerializer.Serialize(inv.ConvertAll(x => new { id = x.id, qty = x.qty }));
         var encoded = Uri.EscapeDataString(invJson);
-        var res     = await _http.GetAsync($"api/plugin/craftable?inv={encoded}");
+        var res     = await _http.GetAsync($"api/plugin/craftable?inv={encoded}&maxMissing={maxMissing}");
         res.EnsureSuccessStatusCode();
         var data = await res.Content.ReadFromJsonAsync<JsonElement>(_json);
         return JsonSerializer.Deserialize<List<CraftableItem>>(

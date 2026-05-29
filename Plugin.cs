@@ -26,7 +26,8 @@ public sealed class Plugin : IDalamudPlugin
     public Plugin(
         IDalamudPluginInterface pluginInterface,
         ICommandManager         commandManager,
-        IPlayerState            playerState)
+        IPlayerState            playerState,
+        IChatGui                chatGui)
     {
         _pi          = pluginInterface;
         _commands    = commandManager;
@@ -37,6 +38,7 @@ public sealed class Plugin : IDalamudPlugin
 
         // Services
         _api = new ApiClient(Config.ApiBaseUrl);
+        ItemInteractions.Initialize(chatGui);
 
         // Windows
         _searchWindow  = new SearchWindow(_api);
