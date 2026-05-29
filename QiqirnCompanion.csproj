@@ -35,4 +35,14 @@
       <Private>false</Private>
     </Reference>
   </ItemGroup>
+
+  <Target Name="DeployToDevPlugins" AfterTargets="Build">
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll"
+          DestinationFolder="$(AppData)\XIVLauncher\devPlugins\$(AssemblyName)"
+          SkipUnchangedFiles="false" />
+    <Copy SourceFiles="$(ProjectDir)$(AssemblyName).json"
+          DestinationFolder="$(AppData)\XIVLauncher\devPlugins\$(AssemblyName)"
+          SkipUnchangedFiles="false" />
+  </Target>
+
 </Project>

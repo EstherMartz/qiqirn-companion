@@ -132,7 +132,9 @@ public class MainWindow : Window, IDisposable
             ImGuiTableFlags.ScrollY     |
             ImGuiTableFlags.SizingFixedFit;
 
-        if (!ImGui.BeginTable("##tasks", 5, flags, new Vector2(0, 220))) return;
+        // Reserve height for the footer line below the table.
+        var tableHeight = ImGui.GetContentRegionAvail().Y - ImGui.GetFrameHeightWithSpacing() * 2;
+        if (!ImGui.BeginTable("##tasks", 5, flags, new Vector2(0, tableHeight))) return;
 
         ImGui.TableSetupColumn("Item",     ImGuiTableColumnFlags.WidthStretch);
         ImGui.TableSetupColumn("Qty",      ImGuiTableColumnFlags.WidthFixed, 60);
@@ -222,7 +224,8 @@ public class MainWindow : Window, IDisposable
             ImGuiTableFlags.ScrollY     |
             ImGuiTableFlags.SizingFixedFit;
 
-        if (!ImGui.BeginTable("##craftable", 4, flags, new Vector2(0, 260))) return;
+        var tableHeight = ImGui.GetContentRegionAvail().Y;
+        if (!ImGui.BeginTable("##craftable", 4, flags, new Vector2(0, tableHeight))) return;
 
         ImGui.TableSetupColumn("Item",         ImGuiTableColumnFlags.WidthStretch);
         ImGui.TableSetupColumn("Can Make",     ImGuiTableColumnFlags.WidthFixed, 80);
