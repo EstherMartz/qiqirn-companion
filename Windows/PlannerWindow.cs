@@ -272,6 +272,17 @@ public class PlannerWindow : Window, IDisposable
             return;
         }
 
+        // Bulk-add everything detected in the ledger that isn't on the plan yet.
+        ImGui.SameLine();
+        if (ImGui.SmallButton($"Add all ({proposals.Count})"))
+        {
+            foreach (var p in proposals) AddProposal(d, p);
+            Save();
+            _proposalLane.Clear();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Add every suggested item to the plan (each to its selected lane, default Craft).");
+
         foreach (var p in proposals)
         {
             ImGui.PushID($"prop_{p.Name}");
@@ -288,21 +299,27 @@ public class PlannerWindow : Window, IDisposable
             ImGui.SameLine();
             if (ImGui.SmallButton("+ Add"))
             {
-                var lane = Lanes.Order[Math.Clamp(laneIdx, 0, Lanes.Order.Length - 1)];
-                PlannerLogic.AddItem(d, lane, new PlanItem
-                {
-                    Name   = p.Name,
-                    Src    = "from sales",
-                    Price  = p.Avg,
-                    Cost   = 0,
-                    PerDay = Math.Round(p.Count / (double)ProposalWindowDays, 1),
-                    Supply = null,
-                });
+                AddProposal(d, p);
                 Save();
                 _proposalLane.Remove(p.Name);
             }
             ImGui.PopID();
         }
+    }
+
+    private void AddProposal(PlannerData d, PlannerInsights.Proposal p)
+    {
+        var laneIdx = _proposalLane.TryGetValue(p.Name, out var li) ? li : 0;
+        var lane = Lanes.Order[Math.Clamp(laneIdx, 0, Lanes.Order.Length - 1)];
+        PlannerLogic.AddItem(d, lane, new PlanItem
+        {
+            Name   = p.Name,
+            Src    = "from sales",
+            Price  = p.Avg,
+            Cost   = 0,
+            PerDay = Math.Round(p.Count / (double)ProposalWindowDays, 1),
+            Supply = null,
+        });
     }
 
     private static long NetProfit(PlannerData d)
