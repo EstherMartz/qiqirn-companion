@@ -3,6 +3,7 @@ using Dalamud.Interface.Windowing;
 using QiqirnCompanion.Services;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 
@@ -13,7 +14,10 @@ public class TradingWindow : Window, IDisposable
     private readonly ApiClient _api;
 
     // ── Preset definitions ────────────────────────────────────────────────
-    private static readonly (string Id, string Label, string Category)[] Presets =
+    // Fallback only — the live list is fetched from the backend so a new
+    // backend preset shows up without a plugin release. Kept in sync as a
+    // sensible offline default.
+    private static readonly (string Id, string Label, string Category)[] FallbackPresets =
     [
         ("mega-value-hq",        "Mega Value HQ",        "trading"),
         ("fast-sellers-hq",      "Fast Sellers HQ",      "trading"),
@@ -47,9 +51,14 @@ public class TradingWindow : Window, IDisposable
     private List<TradingQueryRow> _rows = [];
     private int     _totalRows      = 0;
 
+    // Live preset list (backend-driven; starts from the fallback).
+    private List<(string Id, string Label, string Category)> _presets;
+    private bool _presetsRequested;
+
     public TradingWindow(ApiClient api) : base("Trading##trading")
     {
         _api = api;
+        _presets = new List<(string, string, string)>(FallbackPresets);
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(500, 300),
@@ -59,8 +68,30 @@ public class TradingWindow : Window, IDisposable
 
     public void SetWorld(string? world) => _world = world;
 
+    // Fetch the preset catalog from the backend once; falls back to the built-in
+    // list on failure. Keeps the plugin's buttons in sync with the server.
+    private void EnsurePresetsLoaded()
+    {
+        if (_presetsRequested) return;
+        _presetsRequested = true;
+        Task.Run(async () =>
+        {
+            try
+            {
+                var list = await _api.GetTradingPresetsAsync();
+                if (list is { Count: > 0 })
+                    _presets = list.Select(p => (p.Id, p.Label, p.Category)).ToList();
+            }
+            catch
+            {
+                // keep the fallback list
+            }
+        });
+    }
+
     public void DrawContent()
     {
+        EnsurePresetsLoaded();
         DrawPresetBar();
         ImGui.Separator();
         DrawResults();
@@ -75,7 +106,7 @@ public class TradingWindow : Window, IDisposable
         string? lastCategory = null;
         bool firstInRow = true;
 
-        foreach (var (id, label, category) in Presets)
+        foreach (var (id, label, category) in _presets)
         {
             if (lastCategory != null && lastCategory != category)
             {

@@ -160,6 +160,16 @@ public record TradingQueryResponse(
     [property: JsonPropertyName("scope")]  string                Scope
 );
 
+public record TradingPreset(
+    [property: JsonPropertyName("id")]       string Id,
+    [property: JsonPropertyName("label")]    string Label,
+    [property: JsonPropertyName("category")] string Category
+);
+
+public record TradingPresetsResponse(
+    [property: JsonPropertyName("presets")] List<TradingPreset> Presets
+);
+
 // ── Inventory cleanup ───────────────────────────────────────────────────────
 
 public record CleanupEntry(
@@ -309,6 +319,15 @@ public class ApiClient : IDisposable
         var res = await _http.GetAsync(url);
         res.EnsureSuccessStatusCode();
         return await res.Content.ReadFromJsonAsync<TradingQueryResponse>(_json);
+    }
+
+    /// <summary>Fetch the backend's trading-preset catalog (id/label/category).</summary>
+    public async Task<List<TradingPreset>?> GetTradingPresetsAsync()
+    {
+        var res = await _http.GetAsync("api/plugin/trading/query?list=1");
+        res.EnsureSuccessStatusCode();
+        var data = await res.Content.ReadFromJsonAsync<TradingPresetsResponse>(_json);
+        return data?.Presets;
     }
 
     /// <summary>Classify live inventory into craft/sell/vendor/discard buckets.</summary>
