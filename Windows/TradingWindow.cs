@@ -32,6 +32,11 @@ public class TradingWindow : Window, IDisposable
         ("top-materia",          "Top Materia",           "trading"),
         ("top-minions",          "Top Minions",           "trading"),
         ("gather-commodities",   "Gatherer Commodities",  "gathering"),
+        ("mining-commodities",   "Mining",                "gathering"),
+        ("botany-commodities",   "Botany",                "gathering"),
+        ("fishing-commodities",  "Fishing",               "gathering"),
+        ("intermediate-materials","Intermediate Materials","crafting"),
+        ("craftable-housing",    "Craftable Housing",     "crafting"),
     ];
 
     // ── State ─────────────────────────────────────────────────────────────
