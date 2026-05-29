@@ -38,13 +38,16 @@ jobs:
       - name: Sync version into manifests
         shell: pwsh
         run: |
+          # Targeted replace of the AssemblyVersion value only — preserves JSON
+          # structure (repo.json MUST stay a top-level array) and formatting.
+          # A ConvertFrom/ConvertTo-Json round-trip unrolls the single-element
+          # array into a bare object, which Dalamud rejects ("download failed").
           $version = "${{ steps.version.outputs.version }}"
-          $m = Get-Content QiqirnCompanion.json -Raw | ConvertFrom-Json
-          $m.AssemblyVersion = $version
-          $m | ConvertTo-Json -Depth 10 | Set-Content QiqirnCompanion.json -Encoding utf8
-          $r = Get-Content repo.json -Raw | ConvertFrom-Json
-          $r[0].AssemblyVersion = $version
-          ,$r | ConvertTo-Json -Depth 10 | Set-Content repo.json -Encoding utf8
+          $pattern = '("AssemblyVersion":\s*")[^"]*(")'
+          (Get-Content QiqirnCompanion.json -Raw) -replace $pattern, "`${1}$version`${2}" |
+            Set-Content QiqirnCompanion.json -NoNewline -Encoding utf8
+          (Get-Content repo.json -Raw) -replace $pattern, "`${1}$version`${2}" |
+            Set-Content repo.json -NoNewline -Encoding utf8
 
       - name: Download Dalamud distribution
         shell: pwsh

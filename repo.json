@@ -1,27 +1,24 @@
-{
-  "Author": "Martz",
-  "Name": "Qiqirn Companion",
-  "InternalName": "QiqirnCompanion",
-  "AssemblyVersion": "1.1.0.0",
-  "Description": "Browse open FC craft projects and claim tasks directly from inside the game. Trading queries, item search, and craft-from-inventory with live Marketboard prices.",
-  "Punchline": "In-game FC project tracker, trading scanner, and craft helper.",
-  "Changelog": "Initial release.",
-  "Tags": [
-    "crafting",
-    "inventory",
-    "fc",
-    "market"
-  ],
-  "CategoryTags": [],
-  "ApplicableVersion": "any",
-  "RepoUrl": "https://github.com/EstherMartz/qiqirn-companion",
-  "DalamudApiLevel": 15,
-  "LoadRequiredState": 0,
-  "LoadSync": false,
-  "LoadPriority": 0,
-  "IconUrl": null,
-  "ImageUrls": null,
-  "DownloadLinkInstall": "https://github.com/EstherMartz/qiqirn-companion/releases/latest/download/latest.zip",
-  "DownloadLinkUpdate": "https://github.com/EstherMartz/qiqirn-companion/releases/latest/download/latest.zip",
-  "DownloadLinkTesting": "https://github.com/EstherMartz/qiqirn-companion/releases/latest/download/latest.zip"
-}
+[
+  {
+    "Author": "Martz",
+    "Name": "Qiqirn Companion",
+    "InternalName": "QiqirnCompanion",
+    "AssemblyVersion": "1.1.0.0",
+    "Description": "Browse open FC craft projects and claim tasks directly from inside the game. Trading queries, item search, and craft-from-inventory with live Marketboard prices.",
+    "Punchline": "In-game FC project tracker, trading scanner, and craft helper.",
+    "Changelog": "Initial release.",
+    "Tags": [ "crafting", "inventory", "fc", "market" ],
+    "CategoryTags": [],
+    "ApplicableVersion": "any",
+    "RepoUrl": "https://github.com/EstherMartz/qiqirn-companion",
+    "DalamudApiLevel": 15,
+    "LoadRequiredState": 0,
+    "LoadSync": false,
+    "LoadPriority": 0,
+    "IconUrl": null,
+    "ImageUrls": null,
+    "DownloadLinkInstall": "https://github.com/EstherMartz/qiqirn-companion/releases/latest/download/latest.zip",
+    "DownloadLinkUpdate": "https://github.com/EstherMartz/qiqirn-companion/releases/latest/download/latest.zip",
+    "DownloadLinkTesting": "https://github.com/EstherMartz/qiqirn-companion/releases/latest/download/latest.zip"
+  }
+]
