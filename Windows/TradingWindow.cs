@@ -127,28 +127,31 @@ public class TradingWindow : Window, IDisposable
             ImGuiTableFlags.Borders     |
             ImGuiTableFlags.RowBg       |
             ImGuiTableFlags.ScrollY     |
+            ImGuiTableFlags.Sortable    |
             ImGuiTableFlags.SizingFixedFit;
 
         var tableHeight = ImGui.GetContentRegionAvail().Y - ImGui.GetFrameHeightWithSpacing();
-        if (!ImGui.BeginTable("##tradingRows", 6, flags, new Vector2(0, tableHeight))) return;
+        if (!ImGui.BeginTable("##tradingRows", 8, flags, new Vector2(0, tableHeight))) return;
 
-        ImGui.TableSetupColumn("Item",       ImGuiTableColumnFlags.WidthStretch);
-        ImGui.TableSetupColumn("HQ",         ImGuiTableColumnFlags.WidthFixed, 28);
-        ImGui.TableSetupColumn("Price",      ImGuiTableColumnFlags.WidthFixed, 90);
-        ImGui.TableSetupColumn("Avg",        ImGuiTableColumnFlags.WidthFixed, 90);
-        ImGui.TableSetupColumn("Deal %",     ImGuiTableColumnFlags.WidthFixed, 55);
-        ImGui.TableSetupColumn("Gil/day",    ImGuiTableColumnFlags.WidthFixed, 90);
+        ImGui.TableSetupColumn("Item",     ImGuiTableColumnFlags.WidthStretch);
+        ImGui.TableSetupColumn("HQ",       ImGuiTableColumnFlags.WidthFixed, 28);
+        ImGui.TableSetupColumn("Price",    ImGuiTableColumnFlags.WidthFixed, 80);
+        ImGui.TableSetupColumn("Avg",      ImGuiTableColumnFlags.WidthFixed, 80);
+        ImGui.TableSetupColumn("Deal %",   ImGuiTableColumnFlags.WidthFixed, 55);
+        ImGui.TableSetupColumn("Sales/day",ImGuiTableColumnFlags.WidthFixed, 70);
+        ImGui.TableSetupColumn("Gil/day",  ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, 80);
+        ImGui.TableSetupColumn("Cheapest", ImGuiTableColumnFlags.WidthFixed, 150);
         ImGui.TableHeadersRow();
+
+        SortIfNeeded();
 
         foreach (var row in _rows)
         {
             ImGui.TableNextRow();
 
             ImGui.TableSetColumnIndex(0);
-            if (ImGui.Selectable(row.Name, false, ImGuiSelectableFlags.SpanAllColumns))
-                ImGui.SetClipboardText(row.Name);
-            if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Click to copy");
+            ImGui.Selectable(row.Name, false, ImGuiSelectableFlags.SpanAllColumns);
+            ItemInteractions.HandleRow((uint)row.Id, row.Name, row.Hq);
 
             ImGui.TableSetColumnIndex(1);
             if (row.Hq)
@@ -169,10 +172,42 @@ public class TradingWindow : Window, IDisposable
             ImGui.TextColored(dealColor, $"{row.DealPct}%");
 
             ImGui.TableSetColumnIndex(5);
+            ImGui.TextUnformatted(row.Velocity > 0 ? row.Velocity.ToString("F1") : "—");
+
+            ImGui.TableSetColumnIndex(6);
             ImGui.TextUnformatted(FormatGil((long)row.GilFlow));
+
+            ImGui.TableSetColumnIndex(7);
+            if (row.CheapestWorld != null && row.CheapestPrice.HasValue)
+                ImGui.TextUnformatted($"{row.CheapestWorld} @ {FormatGil((long)row.CheapestPrice.Value)}");
+            else
+                ImGui.TextDisabled("—");
         }
 
         ImGui.EndTable();
+    }
+
+    private void SortIfNeeded()
+    {
+        var specs = ImGui.TableGetSortSpecs();
+        if (!specs.SpecsDirty || specs.SpecsCount == 0) return;
+
+        var spec = specs.Specs;
+        var asc = spec.SortDirection == ImGuiSortDirection.Ascending;
+        Comparison<TradingQueryRow> cmp = spec.ColumnIndex switch
+        {
+            0 => (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
+            1 => (a, b) => a.Hq.CompareTo(b.Hq),
+            2 => (a, b) => a.UnitPrice.CompareTo(b.UnitPrice),
+            3 => (a, b) => a.AveragePrice.CompareTo(b.AveragePrice),
+            4 => (a, b) => a.DealPct.CompareTo(b.DealPct),
+            5 => (a, b) => a.Velocity.CompareTo(b.Velocity),
+            6 => (a, b) => a.GilFlow.CompareTo(b.GilFlow),
+            7 => (a, b) => (a.CheapestPrice ?? double.MaxValue).CompareTo(b.CheapestPrice ?? double.MaxValue),
+            _ => (a, b) => 0,
+        };
+        _rows.Sort((a, b) => asc ? cmp(a, b) : -cmp(a, b));
+        specs.SpecsDirty = false;
     }
 
     private static string FormatGil(long v) =>

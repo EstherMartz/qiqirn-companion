@@ -19,11 +19,13 @@ public static class ItemInteractions
 
     public static void Initialize(IChatGui chat) => _chat = chat;
 
-    public static void HandleRow(uint itemId, string name, bool hq = false)
+    public static void HandleRow(uint itemId, string name, bool hq = false, bool copyOnClick = true)
     {
         if (ImGui.IsItemHovered())
         {
-            ImGui.SetTooltip("Left-click: copy  •  Double-click: link in chat  •  Right-click: more");
+            ImGui.SetTooltip(copyOnClick
+                ? "Left-click: copy  •  Double-click: link in chat  •  Right-click: more"
+                : "Double-click: link in chat  •  Right-click: more");
 
             // Double-click wins over single-click on the second press, so a
             // double-click links exactly once without an extra copy.
@@ -31,7 +33,7 @@ public static class ItemInteractions
             {
                 if (_chat != null) GameActions.LinkItemInChat(_chat, itemId, name, hq);
             }
-            else if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+            else if (copyOnClick && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
             {
                 ImGui.SetClipboardText(name);
             }

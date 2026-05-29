@@ -102,12 +102,16 @@ public class SearchWindow : Window, IDisposable
             return;
         }
 
-        if (ImGui.BeginTable("##itemsTable", 3, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY))
+        const ImGuiTableFlags tableFlags = ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg
+            | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable;
+        if (ImGui.BeginTable("##itemsTable", 3, tableFlags))
         {
             ImGui.TableSetupColumn("Item Name", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Rarity", ImGuiTableColumnFlags.WidthFixed, 60);
             ImGui.TableSetupColumn("Recipe", ImGuiTableColumnFlags.WidthFixed, 60);
             ImGui.TableHeadersRow();
+
+            SortIfNeeded();
 
             foreach (var item in _searchResults)
             {
@@ -119,6 +123,8 @@ public class SearchWindow : Window, IDisposable
                 {
                     SelectItem(item);
                 }
+                // Single-click opens sources (above); add link/menu, no copy-on-click.
+                ItemInteractions.HandleRow((uint)item.Id, item.Name, false, copyOnClick: false);
                 ImGui.PopID();
 
                 ImGui.TableSetColumnIndex(1);
@@ -146,6 +152,24 @@ public class SearchWindow : Window, IDisposable
         }
 
         DrawPagination();
+    }
+
+    private void SortIfNeeded()
+    {
+        var specs = ImGui.TableGetSortSpecs();
+        if (!specs.SpecsDirty || specs.SpecsCount == 0) return;
+
+        var spec = specs.Specs;
+        var asc = spec.SortDirection == ImGuiSortDirection.Ascending;
+        Comparison<ItemSearchResult> cmp = spec.ColumnIndex switch
+        {
+            0 => (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
+            1 => (a, b) => a.Rarity.CompareTo(b.Rarity),
+            2 => (a, b) => a.HasRecipe.CompareTo(b.HasRecipe),
+            _ => (a, b) => 0,
+        };
+        _searchResults.Sort((a, b) => asc ? cmp(a, b) : -cmp(a, b));
+        specs.SpecsDirty = false;
     }
 
     private void DrawPagination()
@@ -232,8 +256,28 @@ public class SearchWindow : Window, IDisposable
         }
     }
 
+    private static string FormatGil(long v) =>
+        v >= 1_000_000 ? $"{v / 1_000_000.0:F1}M"
+        : v >= 1_000   ? $"{v / 1_000.0:F0}k"
+        : v.ToString();
+
+    private void DrawMarketSummary(MarketSummary? market)
+    {
+        if (market == null) return;
+        ImGui.TextColored(new Vector4(0.5f, 0.85f, 1f, 1), "Market");
+        ImGui.Indent();
+        ImGui.TextUnformatted($"Sales/day: {(market.Velocity > 0 ? market.Velocity.ToString("F1") : "—")}   "
+            + $"Listings: {market.ListingCount}");
+        if (market.CheapestWorld != null && market.CheapestPrice.HasValue)
+            ImGui.TextUnformatted($"Cheapest: {market.CheapestWorld} @ {FormatGil(market.CheapestPrice.Value)} gil");
+        ImGui.Unindent();
+        ImGui.Separator();
+    }
+
     private void DrawSourcesList(ItemSourcesResponse sources)
     {
+        DrawMarketSummary(sources.Market);
+
         if (sources.Sources.Count == 0)
         {
             ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1), "No sources available for this item");
