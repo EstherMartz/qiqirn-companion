@@ -1,0 +1,78 @@
+name: Release Plugin
+
+# Push a tag like `v1.1.0.0` to cut a release.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Derive version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          $parts = $version.Split('.')
+          while ($parts.Count -lt 4) { $parts += '0' }   # normalize to 4 parts (1.1 -> 1.1.0.0)
+          $version = ($parts -join '.')
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Release version: $version"
+
+      - name: Sync version into manifests
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $m = Get-Content QiqirnCompanion.json -Raw | ConvertFrom-Json
+          $m.AssemblyVersion = $version
+          $m | ConvertTo-Json -Depth 10 | Set-Content QiqirnCompanion.json -Encoding utf8
+          $r = Get-Content repo.json -Raw | ConvertFrom-Json
+          $r[0].AssemblyVersion = $version
+          ,$r | ConvertTo-Json -Depth 10 | Set-Content repo.json -Encoding utf8
+
+      - name: Download Dalamud distribution
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://goatcorp.github.io/dalamud-distrib/latest.zip" -OutFile dalamud.zip
+          Expand-Archive -Path dalamud.zip -DestinationPath "$env:GITHUB_WORKSPACE\dalamud" -Force
+
+      - name: Build (Release)
+        shell: pwsh
+        env:
+          DALAMUD_HOME: ${{ github.workspace }}\dalamud
+        run: dotnet build --configuration Release /p:AssemblyVersion=${{ steps.version.outputs.version }} /p:FileVersion=${{ steps.version.outputs.version }}
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bin/Release/net10.0-windows/latest.zip
+
+      - name: Commit version bump to main
+        shell: pwsh
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add QiqirnCompanion.json repo.json
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m "chore: release ${{ steps.version.outputs.version }}"
+            git push origin HEAD:main
+          } else {
+            Write-Host "No manifest changes to commit."
+          }

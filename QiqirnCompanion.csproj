@@ -8,6 +8,13 @@
     <RootNamespace>QiqirnCompanion</RootNamespace>
   </PropertyGroup>
 
+  <!-- Dalamud assemblies: default to the local XIVLauncher install, but allow
+       CI to override via the DALAMUD_HOME env var (points at an extracted distrib). -->
+  <PropertyGroup>
+    <DalamudLibPath>$(AppData)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
+    <DalamudLibPath Condition="'$(DALAMUD_HOME)' != ''">$(DALAMUD_HOME)\</DalamudLibPath>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- Copy manifest alongside DLL — Dalamud v15 reads {AssemblyName}.json next to the DLL -->
     <None Include="QiqirnCompanion.json" CopyToOutputDirectory="PreserveNewest" />
@@ -17,32 +24,49 @@
     <!-- Runtime DLLs provided by XIVLauncher — mark Private=false so they
          are NOT copied to the output folder (game loads them at runtime). -->
     <Reference Include="Dalamud">
-      <HintPath>$(AppData)\XIVLauncher\addon\Hooks\dev\Dalamud.dll</HintPath>
+      <HintPath>$(DalamudLibPath)Dalamud.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <!-- Dalamud.Bindings.ImGui exposes the Dalamud.Bindings.ImGui namespace
          (equivalent to the old ImGuiNET namespace in Dalamud 9 and earlier). -->
     <Reference Include="Dalamud.Bindings.ImGui">
-      <HintPath>$(AppData)\XIVLauncher\addon\Hooks\dev\Dalamud.Bindings.ImGui.dll</HintPath>
+      <HintPath>$(DalamudLibPath)Dalamud.Bindings.ImGui.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="ImGuiScene">
-      <HintPath>$(AppData)\XIVLauncher\addon\Hooks\dev\ImGuiScene.dll</HintPath>
+      <HintPath>$(DalamudLibPath)ImGuiScene.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="FFXIVClientStructs">
-      <HintPath>$(AppData)\XIVLauncher\addon\Hooks\dev\FFXIVClientStructs.dll</HintPath>
+      <HintPath>$(DalamudLibPath)FFXIVClientStructs.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
 
-  <Target Name="DeployToDevPlugins" AfterTargets="Build">
+  <!-- Local convenience: copy the freshly-built DLL into XIVLauncher's devPlugins
+       so /xldev → Reload picks it up. Skipped in CI (DALAMUD_HOME is set there). -->
+  <Target Name="DeployToDevPlugins" AfterTargets="Build" Condition="'$(DALAMUD_HOME)' == ''">
     <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll"
           DestinationFolder="$(AppData)\XIVLauncher\devPlugins\$(AssemblyName)"
           SkipUnchangedFiles="false" />
     <Copy SourceFiles="$(ProjectDir)$(AssemblyName).json"
           DestinationFolder="$(AppData)\XIVLauncher\devPlugins\$(AssemblyName)"
           SkipUnchangedFiles="false" />
+  </Target>
+
+  <!-- Package the plugin into latest.zip (DLL + manifest) for distribution.
+       Runs on Release builds; the zip is what guild mates download via the repo. -->
+  <Target Name="PackagePlugin" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <PackStageDir>$(OutputPath)pack\$(AssemblyName)</PackStageDir>
+    </PropertyGroup>
+    <RemoveDir Directories="$(OutputPath)pack" />
+    <MakeDir Directories="$(PackStageDir)" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(PackStageDir)" />
+    <Copy SourceFiles="$(ProjectDir)$(AssemblyName).json"  DestinationFolder="$(PackStageDir)" />
+    <ZipDirectory SourceDirectory="$(PackStageDir)"
+                  DestinationFile="$(OutputPath)latest.zip"
+                  Overwrite="true" />
   </Target>
 
 </Project>
