@@ -65,7 +65,7 @@ public sealed class Plugin : IDalamudPlugin
         // Slash command
         _commands.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open/close the Qiqirn Companion window.",
+            HelpMessage = "/qiqirn — open the window.  /qiqirn <item> — search for an item.",
         });
 
         // Hook into Dalamud's draw loop
@@ -74,7 +74,20 @@ public sealed class Plugin : IDalamudPlugin
         _pi.UiBuilder.OpenMainUi   += ToggleMain;
     }
 
-    private void OnCommand(string command, string args) => ToggleMain();
+    private void OnCommand(string command, string args)
+    {
+        var query = args.Trim();
+        if (query.Length == 0)
+        {
+            ToggleMain();
+            return;
+        }
+
+        // Open the standalone search window and run the query. On an exact name
+        // match, RunQuery's completion path jumps straight to the info window.
+        _searchWindow.IsOpen = true;
+        _searchWindow.RunQuery(query);
+    }
     private void ToggleMain()   => _mainWindow.Toggle();
     private void ToggleConfig() => _configWindow.Toggle();
     private void DrawUI()       => _windowSystem.Draw();
