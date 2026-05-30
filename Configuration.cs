@@ -1,4 +1,5 @@
 using Dalamud.Configuration;
+using Dalamud.Game.ClientState.Keys;
 using Dalamud.Plugin;
 using QiqirnCompanion.Planner;
 using System;
@@ -32,6 +33,12 @@ public class Configuration : IPluginConfiguration
 
     /// <summary>Auto-log retainer market sales into the planner from chat.</summary>
     public bool AutoLogRetainerSales { get; set; } = true;
+
+    /// <summary>Hotkey that toggles the main window. NO_KEY = unbound.</summary>
+    public VirtualKey HotkeyKey   { get; set; } = VirtualKey.NO_KEY;
+    public bool       HotkeyCtrl  { get; set; }
+    public bool       HotkeyAlt   { get; set; }
+    public bool       HotkeyShift { get; set; }
 
     // Injected by Plugin.cs after loading — used to save.
     [NonSerialized]
