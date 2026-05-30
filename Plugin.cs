@@ -26,13 +26,15 @@ public sealed class Plugin : IDalamudPlugin
     private readonly PlannerWindow _plannerWindow;
     private readonly CleanupWindow _cleanupWindow;
     private readonly SalesTracker  _salesTracker;
+    private readonly ContextMenuService _contextMenuService;
 
     public Plugin(
         IDalamudPluginInterface pluginInterface,
         ICommandManager         commandManager,
         IPlayerState            playerState,
         IChatGui                chatGui,
-        IDataManager            dataManager)
+        IDataManager            dataManager,
+        IContextMenu            contextMenu)
     {
         _pi          = pluginInterface;
         _commands    = commandManager;
@@ -61,6 +63,9 @@ public sealed class Plugin : IDalamudPlugin
         _windowSystem.AddWindow(_tradingWindow);
         _windowSystem.AddWindow(_plannerWindow);
         _windowSystem.AddWindow(_cleanupWindow);
+
+        // Native game right-click menu → open item info.
+        _contextMenuService = new ContextMenuService(contextMenu, dataManager, _itemInfoWindow.Show);
 
         // Slash command
         _commands.AddHandler(CommandName, new CommandInfo(OnCommand)
@@ -101,6 +106,7 @@ public sealed class Plugin : IDalamudPlugin
         _commands.RemoveHandler(CommandName);
         _windowSystem.RemoveAllWindows();
         _salesTracker.Dispose();
+        _contextMenuService.Dispose();
         _api.Dispose();
     }
 }
