@@ -674,7 +674,10 @@ public class MainWindow : Window, IDisposable
                 }
                 else
                 {
-                    _newProjectError = result.Error ?? "Could not create project.";
+                    var msg = result.Error ?? "Could not create project.";
+                    if (result.Unmatched != null && result.Unmatched.Count > 0)
+                        msg += $" (couldn't find: {string.Join(", ", result.Unmatched)})";
+                    _newProjectError = msg;
                 }
             }
             catch (Exception ex)
