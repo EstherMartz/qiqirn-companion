@@ -3,7 +3,7 @@
   "Name": "Qiqirn Companion",
   "Description": "Browse open FC craft projects and claim tasks directly from inside the game. Also shows what you can craft from your current inventory with current Marketboard prices.",
   "Punchline": "In-game FC project tracker and craft-from-inventory helper.",
-  "Changelog": "Initial release.",
+  "Changelog": "Smart search: /qiqirn <item> opens results and jumps to item info on an exact match; new 'Qiqirn Search' entry on the game's right-click menu (inventory items + chat links) opens item info directly.",
   "Tags": [
     "crafting",
     "inventory",
@@ -11,7 +11,7 @@
   ],
   "CategoryTags": [],
   "InternalName": "QiqirnCompanion",
-  "AssemblyVersion": "1.2.2.0",
+  "AssemblyVersion": "1.3.0.0",
   "RepoUrl": "https://github.com/EstherMartz/qiqirn-companion",
   "ApplicableVersion": "any",
   "DalamudApiLevel": 15,
