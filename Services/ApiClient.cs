@@ -45,6 +45,13 @@ public record ApiProjectDetail(
     [property: JsonPropertyName("userNames")] Dictionary<string, string>? UserNames
 );
 
+public record CreateProjectResult(
+    [property: JsonPropertyName("ok")]        bool   Ok,
+    [property: JsonPropertyName("projectId")] int    ProjectId,
+    [property: JsonPropertyName("taskCount")] int    TaskCount,
+    [property: JsonPropertyName("error")]     string? Error
+);
+
 public record CraftIngredient(
     [property: JsonPropertyName("itemId")] int    ItemId,
     [property: JsonPropertyName("name")]   string Name,
@@ -291,7 +298,7 @@ public class ApiClient : IDisposable
     /// <summary>List all open projects for a guild.</summary>
     public async Task<List<ApiProject>> GetProjectsAsync(string guildId)
     {
-        var res = await _http.GetAsync($"api/projects?guild={Uri.EscapeDataString(guildId)}");
+        var res = await _http.GetAsync($"api/plugin/projects?guild={Uri.EscapeDataString(guildId)}");
         res.EnsureSuccessStatusCode();
         var data = await res.Content.ReadFromJsonAsync<JsonElement>(_json);
         return JsonSerializer.Deserialize<List<ApiProject>>(
@@ -301,7 +308,7 @@ public class ApiClient : IDisposable
     /// <summary>Get a project and its tasks by ID.</summary>
     public async Task<ApiProjectDetail?> GetProjectDetailAsync(int id)
     {
-        var res = await _http.GetAsync($"api/projects/{id}");
+        var res = await _http.GetAsync($"api/plugin/projects/{id}");
         if (res.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
         res.EnsureSuccessStatusCode();
         return await res.Content.ReadFromJsonAsync<ApiProjectDetail>(_json);
@@ -317,6 +324,18 @@ public class ApiClient : IDisposable
         res.EnsureSuccessStatusCode();
         var data = await res.Content.ReadFromJsonAsync<JsonElement>(_json);
         return JsonSerializer.Deserialize<ApiTask>(data.GetProperty("task").GetRawText(), _json);
+    }
+
+    /// <summary>Create a new crafting project from a target item. Posts to Discord on success.</summary>
+    public async Task<CreateProjectResult> CreateProjectAsync(
+        string guildId, int itemId, int qty, string? name, string characterName, bool intermediates = true)
+    {
+        var body    = new { guildId, itemId, qty, name, characterName, intermediates };
+        var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        var res     = await _http.PostAsync("api/plugin/projects", content);
+        res.EnsureSuccessStatusCode();
+        var result = await res.Content.ReadFromJsonAsync<CreateProjectResult>(_json);
+        return result ?? new CreateProjectResult(false, 0, 0, "Empty response");
     }
 
     /// <summary>Get craftable items for a given inventory (list of itemId + qty pairs).
