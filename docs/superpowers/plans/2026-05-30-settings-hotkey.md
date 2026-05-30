@@ -449,22 +449,21 @@ In `Plugin.cs`:
     private readonly SettingsPanel  _settingsPanel;
 ```
 
-(b) Add the three services to the constructor parameter list (after `IContextMenu contextMenu`):
+(b) Add the two services to the constructor parameter list (after `IContextMenu contextMenu`). `IPlayerState playerState` is ALREADY a parameter — do not duplicate it; `SettingsPanel` reuses it for character name + home world (the installed Dalamud exposes `IPlayerState.HomeWorld`):
 
 ```csharp
         IContextMenu            contextMenu,
         IFramework              framework,
-        IKeyState               keyState,
-        IClientState            clientState)
+        IKeyState               keyState)
 ```
 
-(c) In the `// Windows` region, construct the hotkey service + settings panel **before** `_mainWindow` and `_configWindow`, and pass the panel into both. Replace the existing Windows block so it reads:
+(c) In the `// Windows` region, construct the hotkey service + settings panel **before** `_mainWindow` and `_configWindow`, and pass the panel into both. `SettingsPanel` takes the existing `playerState`. Replace the existing Windows block so it reads:
 
 ```csharp
         // Hotkey service + unified settings panel (constructed before the windows
         // that consume the panel). The toggle lambda reads _mainWindow lazily.
         _hotkeyService = new HotkeyService(framework, keyState, Config, () => _mainWindow.Toggle());
-        _settingsPanel = new SettingsPanel(Config, _hotkeyService, clientState);
+        _settingsPanel = new SettingsPanel(Config, _hotkeyService, playerState);
 
         // Windows
         _itemInfoWindow = new ItemInfoWindow(_api);
@@ -492,7 +491,7 @@ In `Plugin.cs`:
 - [ ] **Step 4: Compile gate**
 
 Run: `cd "C:/Users/esthe/Documents/Dev/qiqirn-companion" && dotnet build -c Debug -clp:ErrorsOnly`
-Expected: `0 Errores`. (`IFramework`/`IKeyState`/`IClientState` are in `Dalamud.Plugin.Services`, already imported by `Plugin.cs`.)
+Expected: `0 Errores`. (`IFramework`/`IKeyState` are in `Dalamud.Plugin.Services`, already imported by `Plugin.cs`.)
 
 - [ ] **Step 5: Commit**
 
