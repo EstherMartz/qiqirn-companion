@@ -5,6 +5,7 @@ using QiqirnCompanion.Services;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace QiqirnCompanion.Windows;
@@ -40,6 +41,7 @@ public class MainWindow : Window, IDisposable
     private string                     _newProjectName     = string.Empty;
     private bool                       _newProjectBusy     = false;
     private string                     _newProjectError    = string.Empty;
+    private string                     _newProjectList     = string.Empty;
     // ── Crafting tab state ────────────────────────────────────────────────────
     private List<CraftableItem> _craftable        = [];
     private bool                _craftLoading     = false;
@@ -543,6 +545,16 @@ public class MainWindow : Window, IDisposable
         }
         if (!string.IsNullOrEmpty(_newProjectError))
             ImGui.TextColored(new Vector4(1, 0.3f, 0.3f, 1), _newProjectError);
+
+        ImGui.Separator();
+        ImGui.TextDisabled("Or paste a list (e.g. \"12x Iron Ore\"):");
+        ImGui.InputTextMultiline("##nplist", ref _newProjectList, 4096, new Vector2(280, 90));
+
+        var canImport = !_newProjectBusy && !string.IsNullOrEmpty(_config.GuildId) && !string.IsNullOrWhiteSpace(_newProjectList);
+        if (!canImport) ImGui.BeginDisabled();
+        if (ImGui.Button("Create from list"))
+            CreateProjectFromList();
+        if (!canImport) ImGui.EndDisabled();
     }
 
     private void SearchNewProjectItems()
@@ -598,6 +610,74 @@ public class MainWindow : Window, IDisposable
             catch (Exception ex)
             {
                 _newProjectError = $"Create failed: {ex.Message}";
+            }
+            finally
+            {
+                _newProjectBusy = false;
+            }
+        });
+    }
+
+    // Parse "12x Item Name" lines. Returns parsed (name, qty) pairs and the count of unparseable lines.
+    private static (List<(string name, int qty)> items, int skipped) ParseList(string text)
+    {
+        var items = new List<(string name, int qty)>();
+        var skipped = 0;
+        var rx = new Regex(@"^\s*(\d+)\s*[xX×]\s*(.+?)\s*$");
+        foreach (var raw in text.Split('\n'))
+        {
+            if (string.IsNullOrWhiteSpace(raw)) continue;
+            var m = rx.Match(raw);
+            if (!m.Success) { skipped++; continue; }
+            if (!int.TryParse(m.Groups[1].Value, out var qty) || qty < 1) { skipped++; continue; }
+            items.Add((m.Groups[2].Value.Trim(), qty));
+        }
+        return (items, skipped);
+    }
+
+    private void CreateProjectFromList()
+    {
+        var (items, skipped) = ParseList(_newProjectList);
+        if (items.Count == 0)
+        {
+            _newProjectError = "No valid lines (expected e.g. \"12x Iron Ore\").";
+            return;
+        }
+        var name = string.IsNullOrWhiteSpace(_newProjectName) ? "Imported project" : _newProjectName.Trim();
+
+        _newProjectBusy = true;
+        _newProjectError = string.Empty;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                var result = await _api.CreateProjectFromListAsync(_config.GuildId, name, items, CharacterName);
+                if (result.Ok)
+                {
+                    var notes = new List<string>();
+                    if (skipped > 0) notes.Add($"skipped {skipped} unparseable line(s)");
+                    if (result.Unmatched != null && result.Unmatched.Count > 0) notes.Add($"couldn't find: {string.Join(", ", result.Unmatched)}");
+                    _newProjectError = notes.Count > 0 ? "Created — " + string.Join("; ", notes) : string.Empty;
+
+                    // Reset the form and refresh. Keep open only if there are notes to read.
+                    _showNewProject     = notes.Count > 0;
+                    _newProjectSearch   = string.Empty;
+                    _newProjectResults  = [];
+                    _newProjectSelected = null;
+                    _newProjectQty      = 1;
+                    _newProjectName     = string.Empty;
+                    _newProjectList     = string.Empty;
+                    LoadProjects();
+                }
+                else
+                {
+                    _newProjectError = result.Error ?? "Could not create project.";
+                }
+            }
+            catch (Exception ex)
+            {
+                _newProjectError = $"Import failed: {ex.Message}";
             }
             finally
             {
