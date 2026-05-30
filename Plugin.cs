@@ -54,7 +54,7 @@ public sealed class Plugin : IDalamudPlugin
 
         // Hotkey service + unified settings panel (constructed before the windows
         // that consume the panel). The toggle lambda reads _mainWindow lazily.
-        _hotkeyService = new HotkeyService(framework, keyState, Config, () => _mainWindow.Toggle());
+        _hotkeyService = new HotkeyService(framework, keyState, Config, () => _mainWindow!.Toggle());
         _settingsPanel = new SettingsPanel(Config, _hotkeyService, playerState);
 
         // Windows
