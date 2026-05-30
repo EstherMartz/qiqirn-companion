@@ -47,6 +47,7 @@ public class MainWindow : Window, IDisposable
     private bool                _includeSaddlebag = false;
     private bool                _craftScanned     = false;
     private int                 _maxMissing       = 0;
+    private string              _craftExportStatus = string.Empty;
 
     public MainWindow(Configuration config, ApiClient api, IPlayerState playerState, SearchWindow searchWindow, TradingWindow tradingWindow, PlannerWindow plannerWindow, CleanupWindow cleanupWindow, SettingsPanel settingsPanel)
         : base("Qiqirn Companion##main", ImGuiWindowFlags.None)
@@ -352,6 +353,18 @@ public class MainWindow : Window, IDisposable
             _maxMissing = Math.Clamp(_maxMissing, 0, 5);
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("0 = only items you can fully craft.\nHigher also lists near-complete crafts missing up to N ingredient types.\nRe-scan to apply.");
+
+        var canExport = _craftable.Exists(c => c.Qty > 0);
+        ImGui.SameLine();
+        if (!canExport) ImGui.BeginDisabled();
+        if (ImGui.Button("Export to Text"))
+            ExportCraftableToText();
+        if (!canExport) ImGui.EndDisabled();
+        if (!string.IsNullOrEmpty(_craftExportStatus))
+        {
+            ImGui.SameLine();
+            ImGui.TextDisabled(_craftExportStatus);
+        }
 
         if (_craftLoading)
         {
@@ -721,6 +734,22 @@ public class MainWindow : Window, IDisposable
                 _craftScanned = true;
             }
         });
+    }
+
+    private void ExportCraftableToText()
+    {
+        var lines = new List<string>();
+        foreach (var c in _craftable)
+            if (c.Qty > 0) lines.Add($"{c.Qty}x {c.Name}");
+
+        if (lines.Count == 0)
+        {
+            _craftExportStatus = "Nothing to export";
+            return;
+        }
+
+        ImGui.SetClipboardText(string.Join("\n", lines));
+        _craftExportStatus = $"Copied {lines.Count} items";
     }
 
     public void Dispose() { }
