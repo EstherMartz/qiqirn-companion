@@ -10,7 +10,8 @@ namespace QiqirnCompanion.Windows;
 /// Unified settings UI rendered both as the main window's "Settings" tab and
 /// inside the gear-icon Config window. Owns its edit buffers; the Save button
 /// persists the text fields, while the hotkey and home-world auto-fill save
-/// immediately when they change.
+/// immediately when they change. Character name + home world both come from
+/// <see cref="IPlayerState"/> (which exposes the resolved World row).
 /// </summary>
 public class SettingsPanel
 {
@@ -46,9 +47,8 @@ public class SettingsPanel
 
     private string? DetectedWorld()
     {
-        // IPlayerState doesn't expose world directly; config allows overriding.
-        // Return null until user sets it — DC-scope presets still work without it.
-        return null;
+        if (!_playerState.IsLoaded) return null;
+        return _playerState.HomeWorld.Value.Name.ToString();
     }
 
     public void DrawContent()
@@ -98,7 +98,7 @@ public class SettingsPanel
         var detectedName  = _playerState.CharacterName;
         var detectedWorld = DetectedWorld();
 
-        ImGui.TextUnformatted($"Detected character: {detectedName ?? "—"}");
+        ImGui.TextUnformatted($"Detected character: {(string.IsNullOrEmpty(detectedName) ? "—" : detectedName)}");
         ImGui.SetNextItemWidth(260);
         ImGui.InputText("Character override##char", ref _charOverrideBuf, 64);
         if (ImGui.IsItemHovered())
