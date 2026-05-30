@@ -548,7 +548,7 @@ public class MainWindow : Window, IDisposable
 
         ImGui.Separator();
         ImGui.TextDisabled("Or paste a list (e.g. \"12x Iron Ore\"):");
-        ImGui.InputTextMultiline("##nplist", ref _newProjectList, 4096, new Vector2(280, 90));
+        ImGui.InputTextMultiline("##nplist", ref _newProjectList, 16384, new Vector2(280, 90));
 
         var canImport = !_newProjectBusy && !string.IsNullOrEmpty(_config.GuildId) && !string.IsNullOrWhiteSpace(_newProjectList);
         if (!canImport) ImGui.BeginDisabled();
@@ -618,16 +618,18 @@ public class MainWindow : Window, IDisposable
         });
     }
 
-    // Parse "12x Item Name" lines. Returns parsed (name, qty) pairs and the count of unparseable lines.
+    // Parse "12x Item Name" lines (qty prefixes x/X/× supported). Skips blank lines
+    // and lines with qty < 1. Returns parsed (name, qty) pairs and the unparseable-line count.
+    private static readonly Regex ListLineRegex = new(@"^\s*(\d+)\s*[xX×]\s*(.+?)\s*$", RegexOptions.Compiled);
+
     private static (List<(string name, int qty)> items, int skipped) ParseList(string text)
     {
         var items = new List<(string name, int qty)>();
         var skipped = 0;
-        var rx = new Regex(@"^\s*(\d+)\s*[xX×]\s*(.+?)\s*$");
         foreach (var raw in text.Split('\n'))
         {
             if (string.IsNullOrWhiteSpace(raw)) continue;
-            var m = rx.Match(raw);
+            var m = ListLineRegex.Match(raw);
             if (!m.Success) { skipped++; continue; }
             if (!int.TryParse(m.Groups[1].Value, out var qty) || qty < 1) { skipped++; continue; }
             items.Add((m.Groups[2].Value.Trim(), qty));
