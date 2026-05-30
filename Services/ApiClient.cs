@@ -49,7 +49,8 @@ public record CreateProjectResult(
     [property: JsonPropertyName("ok")]        bool   Ok,
     [property: JsonPropertyName("projectId")] int    ProjectId,
     [property: JsonPropertyName("taskCount")] int    TaskCount,
-    [property: JsonPropertyName("error")]     string? Error
+    [property: JsonPropertyName("error")]     string? Error,
+    [property: JsonPropertyName("unmatched")] List<string>? Unmatched
 );
 
 public record CraftIngredient(
@@ -335,7 +336,25 @@ public class ApiClient : IDisposable
         var res     = await _http.PostAsync("api/plugin/projects", content);
         res.EnsureSuccessStatusCode();
         var result = await res.Content.ReadFromJsonAsync<CreateProjectResult>(_json);
-        return result ?? new CreateProjectResult(false, 0, 0, "Empty response");
+        return result ?? new CreateProjectResult(false, 0, 0, "Empty response", null);
+    }
+
+    /// <summary>Create a project from a pasted list of (name, qty) target items. Posts to Discord on success.</summary>
+    public async Task<CreateProjectResult> CreateProjectFromListAsync(
+        string guildId, string name, List<(string name, int qty)> items, string characterName)
+    {
+        var body = new
+        {
+            guildId,
+            name,
+            characterName,
+            items = items.ConvertAll(i => new { name = i.name, qty = i.qty }),
+        };
+        var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        var res     = await _http.PostAsync("api/plugin/projects", content);
+        res.EnsureSuccessStatusCode();
+        var result = await res.Content.ReadFromJsonAsync<CreateProjectResult>(_json);
+        return result ?? new CreateProjectResult(false, 0, 0, "Empty response", null);
     }
 
     /// <summary>Get craftable items for a given inventory (list of itemId + qty pairs).
