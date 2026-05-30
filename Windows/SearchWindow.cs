@@ -225,6 +225,7 @@ public class SearchWindow : Window, IDisposable
     /// </summary>
     public void RunQuery(string query)
     {
+        query = query.Trim();
         _searchQuery = query;
         _currentPage = 1;
         if (query.Length >= 2)

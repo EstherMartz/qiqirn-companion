@@ -57,8 +57,12 @@ public sealed class ContextMenuService : IDisposable
 
             // Right-clicking an item link printed in chat.
             case MenuTargetDefault when args.AddonName == "ChatLog":
-                itemId = NormalizeItemId(AgentChatLog.Instance()->ContextItemId);
+            {
+                var agent = AgentChatLog.Instance();
+                if (agent != null)
+                    itemId = NormalizeItemId(agent->ContextItemId);
                 break;
+            }
         }
         return itemId != 0;
     }
