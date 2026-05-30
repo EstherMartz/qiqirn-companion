@@ -132,6 +132,7 @@ public class ItemInfoWindow : Window, IDisposable
 
         foreach (var source in sources.Sources)
         {
+            if (source is null) continue;
             switch (source)
             {
                 case RecipeSource recipe:            DrawRecipeSource(recipe);            break;

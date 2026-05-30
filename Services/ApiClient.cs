@@ -124,6 +124,37 @@ public record CompanyCraftSource(
     [property: JsonPropertyName("ingredients")] List<IngredientItem> Ingredients
 ) : ItemSource(Type);
 
+/// <summary>
+/// Polymorphic deserializer for <see cref="ItemSource"/>. System.Text.Json can't
+/// instantiate the abstract base, so we dispatch on the backend's "type"
+/// discriminator to the concrete record. Discriminator strings come from
+/// api/plugin-item-sources.mjs (note "gather", "special_shop", "company_craft").
+/// Unrecognized types (incl. the "unknown" placeholder) deserialize to null and
+/// are skipped by the UI.
+/// </summary>
+public sealed class ItemSourceConverter : JsonConverter<ItemSource>
+{
+    public override ItemSource? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        using var doc = JsonDocument.ParseValue(ref reader);
+        var root = doc.RootElement;
+        var type = root.TryGetProperty("type", out var t) ? t.GetString() : null;
+        var raw = root.GetRawText();
+        return type switch
+        {
+            "recipe"        => JsonSerializer.Deserialize<RecipeSource>(raw, options),
+            "vendor"        => JsonSerializer.Deserialize<VendorSource>(raw, options),
+            "gather"        => JsonSerializer.Deserialize<GatheringSource>(raw, options),
+            "special_shop"  => JsonSerializer.Deserialize<SpecialShopSource>(raw, options),
+            "company_craft" => JsonSerializer.Deserialize<CompanyCraftSource>(raw, options),
+            _               => null,
+        };
+    }
+
+    public override void Write(Utf8JsonWriter writer, ItemSource value, JsonSerializerOptions options)
+        => JsonSerializer.Serialize(writer, value, value.GetType(), options);
+}
+
 public record MarketSummary(
     [property: JsonPropertyName("velocity")]      double  Velocity,
     [property: JsonPropertyName("listingCount")]  int     ListingCount,
@@ -245,7 +276,11 @@ public record CleanupResponse(
 public class ApiClient : IDisposable
 {
     private readonly HttpClient _http;
-    private readonly JsonSerializerOptions _json = new() { PropertyNameCaseInsensitive = true };
+    private readonly JsonSerializerOptions _json = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new ItemSourceConverter() },
+    };
 
     public ApiClient(string baseUrl)
     {
