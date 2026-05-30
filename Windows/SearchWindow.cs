@@ -11,6 +11,7 @@ namespace QiqirnCompanion.Windows;
 public class SearchWindow : Window, IDisposable
 {
     private readonly ApiClient _api;
+    private readonly ItemInfoWindow _itemInfo;
 
     // Search state
     private string _searchQuery = "";
@@ -21,16 +22,14 @@ public class SearchWindow : Window, IDisposable
     private int _totalResults = 0;
     private const int PageSize = 20;
 
-    // Sources modal state
-    private ItemSearchResult? _selectedItem = null;
-    private ItemSourcesResponse? _selectedSources = null;
-    private bool _isLoadingSources = false;
-    private string? _sourcesError = null;
-    private bool _sourcesModalOpen = false;
+    // Set by RunQuery; consumed once when the next search completes, to jump
+    // straight to ItemInfoWindow on an exact name match.
+    private string? _pendingExactQuery = null;
 
-    public SearchWindow(ApiClient api) : base("Item Search")
+    public SearchWindow(ApiClient api, ItemInfoWindow itemInfo) : base("Item Search")
     {
         _api = api;
+        _itemInfo = itemInfo;
         Flags |= ImGuiWindowFlags.NoScrollbar;
         SizeConstraints = new WindowSizeConstraints
         {
@@ -67,7 +66,6 @@ public class SearchWindow : Window, IDisposable
         }
 
         DrawResults();
-        DrawSourcesModal();
     }
 
     private void DrawSearchBar()
@@ -119,7 +117,7 @@ public class SearchWindow : Window, IDisposable
 
                 ImGui.TableSetColumnIndex(0);
                 ImGui.PushID($"item_{item.Id}");
-                if (ImGui.Selectable(item.Name, _selectedItem?.Id == item.Id, ImGuiSelectableFlags.SpanAllColumns))
+                if (ImGui.Selectable(item.Name, false, ImGuiSelectableFlags.SpanAllColumns))
                 {
                     SelectItem(item);
                 }
@@ -219,151 +217,27 @@ public class SearchWindow : Window, IDisposable
         }
     }
 
-    private void DrawSourcesModal()
-    {
-        if (_selectedItem == null) return;
+    private void SelectItem(ItemSearchResult item) => _itemInfo.Show((uint)item.Id, item.Name);
 
-        ImGui.SetNextWindowSize(new Vector2(600, 400), ImGuiCond.FirstUseEver);
-        if (ImGui.BeginPopupModal($"Sources: {_selectedItem.Name}##sources", ref _sourcesModalOpen))
+    /// <summary>
+    /// Run a search from outside the window (the <c>/qiqirn &lt;item&gt;</c> command).
+    /// On completion, an exact name match jumps straight to <see cref="ItemInfoWindow"/>.
+    /// </summary>
+    public void RunQuery(string query)
+    {
+        _searchQuery = query;
+        _currentPage = 1;
+        if (query.Length >= 2)
         {
-            if (_sourcesError != null)
-            {
-                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1, 0.2f, 0.2f, 1));
-                ImGui.TextWrapped($"Error: {_sourcesError}");
-                ImGui.PopStyleColor();
-            }
-            else if (_isLoadingSources)
-            {
-                ImGui.Text("Loading sources...");
-            }
-            else if (_selectedSources != null)
-            {
-                DrawSourcesList(_selectedSources);
-            }
-
-            ImGui.Spacing();
-            ImGui.Separator();
-            ImGui.SetCursorPosX(ImGui.GetWindowWidth() - 100);
-            if (ImGui.Button("Close", new Vector2(90, 0)))
-            {
-                _selectedItem    = null;
-                _selectedSources = null;
-                _sourcesModalOpen = false;
-                ImGui.CloseCurrentPopup();
-            }
-
-            ImGui.EndPopup();
+            _pendingExactQuery = query;
+            _ = PerformSearch();
         }
-    }
-
-    private static string FormatGil(long v) =>
-        v >= 1_000_000 ? $"{v / 1_000_000.0:F1}M"
-        : v >= 1_000   ? $"{v / 1_000.0:F0}k"
-        : v.ToString();
-
-    private void DrawMarketSummary(MarketSummary? market)
-    {
-        if (market == null) return;
-        ImGui.TextColored(new Vector4(0.5f, 0.85f, 1f, 1), "Market");
-        ImGui.Indent();
-        ImGui.TextUnformatted($"Sales/day: {(market.Velocity > 0 ? market.Velocity.ToString("F1") : "—")}   "
-            + $"Listings: {market.ListingCount}");
-        if (market.CheapestWorld != null && market.CheapestPrice.HasValue)
-            ImGui.TextUnformatted($"Cheapest: {market.CheapestWorld} @ {FormatGil(market.CheapestPrice.Value)} gil");
-        ImGui.Unindent();
-        ImGui.Separator();
-    }
-
-    private void DrawSourcesList(ItemSourcesResponse sources)
-    {
-        DrawMarketSummary(sources.Market);
-
-        if (sources.Sources.Count == 0)
+        else
         {
-            ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1), "No sources available for this item");
-            return;
+            _pendingExactQuery = null;
+            _searchResults.Clear();
+            _totalResults = 0;
         }
-
-        foreach (var source in sources.Sources)
-        {
-            switch (source)
-            {
-                case RecipeSource recipe:
-                    DrawRecipeSource(recipe);
-                    break;
-                case VendorSource vendor:
-                    DrawVendorSource(vendor);
-                    break;
-                case GatheringSource gathering:
-                    DrawGatheringSource(gathering);
-                    break;
-                case SpecialShopSource specialShop:
-                    DrawSpecialShopSource(specialShop);
-                    break;
-                case CompanyCraftSource companyCraft:
-                    DrawCompanyCraftSource(companyCraft);
-                    break;
-            }
-            ImGui.Spacing();
-        }
-    }
-
-    private void DrawRecipeSource(RecipeSource recipe)
-    {
-        ImGui.TextColored(new Vector4(0.2f, 0.8f, 1, 1), $"📖 {recipe.JobName} (Lv. {recipe.Level})");
-        ImGui.Indent();
-        ImGui.Text($"Yield: {recipe.OutputQty}");
-        ImGui.TextColored(new Vector4(0.8f, 0.8f, 0.8f, 1), "Ingredients:");
-        foreach (var ing in recipe.Ingredients)
-        {
-            ImGui.BulletText($"{ing.ItemName} x{ing.Qty}");
-        }
-        ImGui.Unindent();
-    }
-
-    private void DrawVendorSource(VendorSource vendor)
-    {
-        ImGui.TextColored(new Vector4(1, 0.8f, 0.2f, 1), $"🏪 NPC Vendor");
-        ImGui.Indent();
-        ImGui.Text($"Price: {vendor.Price:N0} gil");
-        ImGui.Unindent();
-    }
-
-    private void DrawGatheringSource(GatheringSource gathering)
-    {
-        var timedLabel = gathering.Timed ? " (Timed)" : "";
-        ImGui.TextColored(new Vector4(0.2f, 1, 0.2f, 1), $"⛏️ Gathering (Lv. {gathering.Level}){timedLabel}");
-    }
-
-    private void DrawSpecialShopSource(SpecialShopSource specialShop)
-    {
-        ImGui.TextColored(new Vector4(1, 0.5f, 0.8f, 1), $"⭐ Special Shop");
-        ImGui.Indent();
-        ImGui.Text($"Cost: {specialShop.Cost} {specialShop.Currency}");
-        ImGui.Unindent();
-    }
-
-    private void DrawCompanyCraftSource(CompanyCraftSource companyCraft)
-    {
-        ImGui.TextColored(new Vector4(1, 0.7f, 0.2f, 1), $"🏢 {companyCraft.CraftName}");
-        ImGui.Indent();
-        ImGui.TextColored(new Vector4(0.8f, 0.8f, 0.8f, 1), "Materials:");
-        foreach (var ing in companyCraft.Ingredients)
-        {
-            ImGui.BulletText($"{ing.ItemName} x{ing.Qty}");
-        }
-        ImGui.Unindent();
-    }
-
-    private void SelectItem(ItemSearchResult item)
-    {
-        _selectedItem     = item;
-        _selectedSources  = null;
-        _isLoadingSources = true;
-        _sourcesError     = null;
-        _sourcesModalOpen = true;
-        ImGui.OpenPopup($"Sources: {item.Name}##sources");
-        _ = LoadItemSources(item.Id);
     }
 
     private async Task PerformSearch()
@@ -380,6 +254,15 @@ public class SearchWindow : Window, IDisposable
             {
                 _searchResults = response.Items;
                 _totalResults = response.Total;
+
+                if (_pendingExactQuery is { } exact)
+                {
+                    _pendingExactQuery = null;
+                    var matches = _searchResults.FindAll(r =>
+                        string.Equals(r.Name.Trim(), exact, StringComparison.OrdinalIgnoreCase));
+                    if (matches.Count == 1)
+                        _itemInfo.Show((uint)matches[0].Id, matches[0].Name);
+                }
             }
         }
         catch (Exception ex)
@@ -391,24 +274,6 @@ public class SearchWindow : Window, IDisposable
         finally
         {
             _isSearching = false;
-        }
-    }
-
-    private async Task LoadItemSources(int itemId)
-    {
-        try
-        {
-            _selectedSources = await _api.GetItemSourcesAsync(itemId);
-            _sourcesError = null;
-        }
-        catch (Exception ex)
-        {
-            _sourcesError = ex.Message;
-            _selectedSources = null;
-        }
-        finally
-        {
-            _isLoadingSources = false;
         }
     }
 

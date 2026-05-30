@@ -21,6 +21,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly MainWindow    _mainWindow;
     private readonly ConfigWindow  _configWindow;
     private readonly SearchWindow  _searchWindow;
+    private readonly ItemInfoWindow _itemInfoWindow;
     private readonly TradingWindow _tradingWindow;
     private readonly PlannerWindow _plannerWindow;
     private readonly CleanupWindow _cleanupWindow;
@@ -46,7 +47,8 @@ public sealed class Plugin : IDalamudPlugin
         _salesTracker = new SalesTracker(chatGui, dataManager, Config);
 
         // Windows
-        _searchWindow  = new SearchWindow(_api);
+        _itemInfoWindow = new ItemInfoWindow(_api);
+        _searchWindow  = new SearchWindow(_api, _itemInfoWindow);
         _tradingWindow = new TradingWindow(_api);
         _plannerWindow = new PlannerWindow(Config, _salesTracker);
         _cleanupWindow = new CleanupWindow(_api);
@@ -55,6 +57,7 @@ public sealed class Plugin : IDalamudPlugin
         _windowSystem.AddWindow(_mainWindow);
         _windowSystem.AddWindow(_configWindow);
         _windowSystem.AddWindow(_searchWindow);
+        _windowSystem.AddWindow(_itemInfoWindow);
         _windowSystem.AddWindow(_tradingWindow);
         _windowSystem.AddWindow(_plannerWindow);
         _windowSystem.AddWindow(_cleanupWindow);
