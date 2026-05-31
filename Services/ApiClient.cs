@@ -327,6 +327,45 @@ public class ApiClient : IDisposable
         return JsonSerializer.Deserialize<ApiTask>(data.GetProperty("task").GetRawText(), _json);
     }
 
+    /// <summary>Log progress on a task you've claimed (adds <paramref name="amount"/> to qtyDone).
+    /// Returns the updated task, or null if you don't own the claim.</summary>
+    public async Task<ApiTask?> LogProgressAsync(int projectId, int taskId, string characterName, string guildId, int amount)
+    {
+        var body    = new { projectId, taskId, characterName, guildId, action = "progress", amount };
+        var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        var res     = await _http.PostAsync("api/plugin/claim", content);
+        if (res.StatusCode == System.Net.HttpStatusCode.Conflict) return null;
+        res.EnsureSuccessStatusCode();
+        var data = await res.Content.ReadFromJsonAsync<JsonElement>(_json);
+        return JsonSerializer.Deserialize<ApiTask>(data.GetProperty("task").GetRawText(), _json);
+    }
+
+    /// <summary>Set qtyDone on a task you've claimed to an absolute value (clamped 0..qtyNeeded),
+    /// used to correct mistakes. Returns the updated task, or null if you don't own the claim.</summary>
+    public async Task<ApiTask?> SetProgressAsync(int projectId, int taskId, string characterName, string guildId, int qtyDone)
+    {
+        var body    = new { projectId, taskId, characterName, guildId, action = "set", amount = qtyDone };
+        var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        var res     = await _http.PostAsync("api/plugin/claim", content);
+        if (res.StatusCode == System.Net.HttpStatusCode.Conflict) return null;
+        res.EnsureSuccessStatusCode();
+        var data = await res.Content.ReadFromJsonAsync<JsonElement>(_json);
+        return JsonSerializer.Deserialize<ApiTask>(data.GetProperty("task").GetRawText(), _json);
+    }
+
+    /// <summary>Mark a task you've claimed as fully complete (fills qtyDone to qtyNeeded).
+    /// Returns the updated task, or null if you don't own the claim.</summary>
+    public async Task<ApiTask?> CompleteTaskAsync(int projectId, int taskId, string characterName, string guildId)
+    {
+        var body    = new { projectId, taskId, characterName, guildId, action = "complete" };
+        var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        var res     = await _http.PostAsync("api/plugin/claim", content);
+        if (res.StatusCode == System.Net.HttpStatusCode.Conflict) return null;
+        res.EnsureSuccessStatusCode();
+        var data = await res.Content.ReadFromJsonAsync<JsonElement>(_json);
+        return JsonSerializer.Deserialize<ApiTask>(data.GetProperty("task").GetRawText(), _json);
+    }
+
     /// <summary>Create a new crafting project from a target item. Posts to Discord on success.</summary>
     public async Task<CreateProjectResult> CreateProjectAsync(
         string guildId, int itemId, int qty, string? name, string characterName, bool intermediates = true)

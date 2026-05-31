@@ -30,6 +30,7 @@ public class MainWindow : Window, IDisposable
     private bool                _claimInProgress     = false;
     private string              _claimError          = string.Empty;
     private string?             _selectedPhaseKey    = null;   // "partKey\0phaseIndex"; null = all
+    private readonly Dictionary<int, int> _progressAmounts = new();  // per-task "Add" input value
 
 
     // New-project form state
@@ -257,7 +258,7 @@ public class MainWindow : Window, IDisposable
         ImGui.TableSetupColumn("Qty",      ImGuiTableColumnFlags.WidthFixed, 60);
         ImGui.TableSetupColumn("Status",   ImGuiTableColumnFlags.WidthFixed, 70);
         ImGui.TableSetupColumn("Assignee", ImGuiTableColumnFlags.WidthFixed, 140);
-        ImGui.TableSetupColumn("",         ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 60);
+        ImGui.TableSetupColumn("",         ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 200);
         ImGui.TableHeadersRow();
 
         SortTasksIfNeeded(detail.Tasks);
@@ -288,15 +289,44 @@ public class MainWindow : Window, IDisposable
             ImGui.TextUnformatted(ResolveAssignee(detail, task));
 
             ImGui.TableSetColumnIndex(4);
+            ImGui.PushID(task.Id);
+            if (_claimInProgress) ImGui.BeginDisabled();
             if (task.Status == "open")
             {
-                ImGui.PushID(task.Id);
-                if (_claimInProgress) ImGui.BeginDisabled();
                 if (ImGui.SmallButton("Claim"))
                     ClaimTask(detail.Project.Id, task.Id);
-                if (_claimInProgress) ImGui.EndDisabled();
-                ImGui.PopID();
             }
+            else if (task.Status == "claimed" && IsMyClaim(task))
+            {
+                // Only the claimer can edit progress. The input is an item count in
+                // [0, qtyNeeded]: "Add" adds it to your progress (capped server-side),
+                // "Set" overwrites the total — the way to fix an over-log.
+                var amt = _progressAmounts.TryGetValue(task.Id, out var v) ? v : 1;
+                amt = Math.Clamp(amt, 0, task.QtyNeeded);
+
+                ImGui.SetNextItemWidth(46);
+                if (ImGui.InputInt("##amt", ref amt, 0, 0))
+                    _progressAmounts[task.Id] = Math.Clamp(amt, 0, task.QtyNeeded);
+
+                ImGui.SameLine();
+                if (amt < 1) ImGui.BeginDisabled();
+                if (ImGui.SmallButton("Add"))
+                    LogProgress(detail.Project.Id, task.Id, amt);
+                if (amt < 1) ImGui.EndDisabled();
+                else if (ImGui.IsItemHovered()) ImGui.SetTooltip("Add this many to your progress");
+
+                ImGui.SameLine();
+                if (ImGui.SmallButton("Set"))
+                    SetProgress(detail.Project.Id, task.Id, amt);
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Set total done to this value (0–{task.QtyNeeded}) — use to fix mistakes");
+
+                ImGui.SameLine();
+                if (ImGui.SmallButton("Done"))
+                    CompleteTask(detail.Project.Id, task.Id);
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Mark fully complete");
+            }
+            if (_claimInProgress) ImGui.EndDisabled();
+            ImGui.PopID();
         }
 
         ImGui.EndTable();
@@ -764,6 +794,109 @@ public class MainWindow : Window, IDisposable
             catch (Exception ex)
             {
                 _claimError = $"Claim failed: {ex.Message}";
+            }
+            finally
+            {
+                _claimInProgress = false;
+            }
+        });
+    }
+
+    // A character-claim stores the character name as the assignee id, so a task is
+    // "mine" when its assignee matches the current character. Discord-claimed tasks
+    // store a Discord user id, which won't match — their controls stay hidden.
+    private bool IsMyClaim(ApiTask task) =>
+        task.AssigneeId is { Length: > 0 } id &&
+        string.Equals(id, CharacterName, StringComparison.Ordinal);
+
+    private void LogProgress(int projectId, int taskId, int amount)
+    {
+        _claimInProgress = true;
+        _claimError      = string.Empty;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                var updated = await _api.LogProgressAsync(projectId, taskId, CharacterName, _config.GuildId, amount);
+                if (updated is null)
+                {
+                    _claimError = "Couldn't log progress — you may no longer own this claim. Refresh.";
+                }
+                else if (_projectDetail is not null)
+                {
+                    var idx = _projectDetail.Tasks.FindIndex(t => t.Id == updated.Id);
+                    if (idx >= 0) _projectDetail.Tasks[idx] = updated;
+                    _progressAmounts.Remove(taskId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _claimError = $"Progress failed: {ex.Message}";
+            }
+            finally
+            {
+                _claimInProgress = false;
+            }
+        });
+    }
+
+    private void SetProgress(int projectId, int taskId, int qtyDone)
+    {
+        _claimInProgress = true;
+        _claimError      = string.Empty;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                var updated = await _api.SetProgressAsync(projectId, taskId, CharacterName, _config.GuildId, qtyDone);
+                if (updated is null)
+                {
+                    _claimError = "Couldn't update progress — you may no longer own this claim. Refresh.";
+                }
+                else if (_projectDetail is not null)
+                {
+                    var idx = _projectDetail.Tasks.FindIndex(t => t.Id == updated.Id);
+                    if (idx >= 0) _projectDetail.Tasks[idx] = updated;
+                    _progressAmounts.Remove(taskId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _claimError = $"Update failed: {ex.Message}";
+            }
+            finally
+            {
+                _claimInProgress = false;
+            }
+        });
+    }
+
+    private void CompleteTask(int projectId, int taskId)
+    {
+        _claimInProgress = true;
+        _claimError      = string.Empty;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                var updated = await _api.CompleteTaskAsync(projectId, taskId, CharacterName, _config.GuildId);
+                if (updated is null)
+                {
+                    _claimError = "Couldn't mark complete — you may no longer own this claim. Refresh.";
+                }
+                else if (_projectDetail is not null)
+                {
+                    var idx = _projectDetail.Tasks.FindIndex(t => t.Id == updated.Id);
+                    if (idx >= 0) _projectDetail.Tasks[idx] = updated;
+                    _progressAmounts.Remove(taskId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _claimError = $"Complete failed: {ex.Message}";
             }
             finally
             {
