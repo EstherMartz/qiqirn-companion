@@ -252,9 +252,11 @@ public class MainWindow : Window, IDisposable
 
         // Reserve height for the footer line below the table.
         var tableHeight = ImGui.GetContentRegionAvail().Y - ImGui.GetFrameHeightWithSpacing() * 2;
-        if (!ImGui.BeginTable("##tasks", 5, flags, new Vector2(0, tableHeight))) return;
+        if (!ImGui.BeginTable("##tasks", 7, flags, new Vector2(0, tableHeight))) return;
 
         ImGui.TableSetupColumn("Item",     ImGuiTableColumnFlags.WidthStretch);
+        ImGui.TableSetupColumn("Category", ImGuiTableColumnFlags.WidthFixed, 90);
+        ImGui.TableSetupColumn("Job",      ImGuiTableColumnFlags.WidthFixed, 110);
         ImGui.TableSetupColumn("Qty",      ImGuiTableColumnFlags.WidthFixed, 60);
         ImGui.TableSetupColumn("Status",   ImGuiTableColumnFlags.WidthFixed, 70);
         ImGui.TableSetupColumn("Assignee", ImGuiTableColumnFlags.WidthFixed, 140);
@@ -274,9 +276,15 @@ public class MainWindow : Window, IDisposable
             ItemInteractions.HandleRow((uint)task.ItemId, task.ItemName);
 
             ImGui.TableSetColumnIndex(1);
-            ImGui.TextUnformatted($"{task.QtyDone}/{task.QtyNeeded}");
+            ImGui.TextUnformatted(CategoryLabel(task.Source));
 
             ImGui.TableSetColumnIndex(2);
+            ImGui.TextUnformatted(JobLabel(task.Meta));
+
+            ImGui.TableSetColumnIndex(3);
+            ImGui.TextUnformatted($"{task.QtyDone}/{task.QtyNeeded}");
+
+            ImGui.TableSetColumnIndex(4);
             var statusColor = task.Status switch
             {
                 "done"    => new Vector4(0.4f, 0.9f, 0.4f, 1),
@@ -285,10 +293,10 @@ public class MainWindow : Window, IDisposable
             };
             ImGui.TextColored(statusColor, task.Status);
 
-            ImGui.TableSetColumnIndex(3);
+            ImGui.TableSetColumnIndex(5);
             ImGui.TextUnformatted(ResolveAssignee(detail, task));
 
-            ImGui.TableSetColumnIndex(4);
+            ImGui.TableSetColumnIndex(6);
             ImGui.PushID(task.Id);
             if (_claimInProgress) ImGui.BeginDisabled();
             if (task.Status == "open")
@@ -385,9 +393,11 @@ public class MainWindow : Window, IDisposable
         Comparison<ApiTask> cmp = spec.ColumnIndex switch
         {
             0 => (a, b) => string.Compare(a.ItemName, b.ItemName, StringComparison.OrdinalIgnoreCase),
-            1 => (a, b) => a.QtyNeeded.CompareTo(b.QtyNeeded),
-            2 => (a, b) => string.Compare(a.Status, b.Status, StringComparison.OrdinalIgnoreCase),
-            3 => (a, b) => string.Compare(a.AssigneeId ?? "", b.AssigneeId ?? "", StringComparison.OrdinalIgnoreCase),
+            1 => (a, b) => string.Compare(CategoryLabel(a.Source), CategoryLabel(b.Source), StringComparison.OrdinalIgnoreCase),
+            2 => (a, b) => string.Compare(JobLabel(a.Meta), JobLabel(b.Meta), StringComparison.OrdinalIgnoreCase),
+            3 => (a, b) => a.QtyNeeded.CompareTo(b.QtyNeeded),
+            4 => (a, b) => string.Compare(a.Status, b.Status, StringComparison.OrdinalIgnoreCase),
+            5 => (a, b) => string.Compare(a.AssigneeId ?? "", b.AssigneeId ?? "", StringComparison.OrdinalIgnoreCase),
             _ => (a, b) => 0,
         };
         tasks.Sort((a, b) => asc ? cmp(a, b) : -cmp(a, b));
