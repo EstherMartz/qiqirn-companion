@@ -577,7 +577,7 @@ public class MainWindow : Window, IDisposable
             ImGui.TextColored(new Vector4(1, 0.3f, 0.3f, 1), _newProjectError);
 
         ImGui.Separator();
-        ImGui.TextDisabled("Or paste a list (e.g. \"12x Iron Ore\"):");
+        ImGui.TextDisabled("Or paste a list (e.g. \"12x Iron Ore\" or \"Iron Ore x12\"):");
         ImGui.InputTextMultiline("##nplist", ref _newProjectList, 16384, new Vector2(280, 90));
 
         var canImport = !_newProjectBusy && !string.IsNullOrEmpty(_config.GuildId) && !string.IsNullOrWhiteSpace(_newProjectList);
@@ -648,9 +648,19 @@ public class MainWindow : Window, IDisposable
         });
     }
 
-    // Parse "12x Item Name" lines (qty prefixes x/X/× supported). Skips blank lines
-    // and lines with qty < 1. Returns parsed (name, qty) pairs and the unparseable-line count.
-    private static readonly Regex ListLineRegex = new(@"^\s*(\d+)\s*[xX×]\s*(.+?)\s*$", RegexOptions.Compiled);
+    // Parse list lines in either order, with or without an "x" marker. Patterns
+    // are tried in order and the FIRST match wins, so "x"-marked forms beat
+    // bare-number forms — that keeps names with embedded digits intact
+    // (e.g. "Grade 4 Tincture x3" → qty 3, not 4). Skips blank lines and lines
+    // with qty < 1. Returns the parsed (name, qty) pairs and the count of
+    // unparseable lines.
+    private static readonly Regex[] ListLineRegexes =
+    [
+        new(@"^\s*(?<name>.+?)\s*[xX×]\s*(?<qty>\d+)\s*$", RegexOptions.Compiled), // Iron Ore x12
+        new(@"^\s*(?<qty>\d+)\s*[xX×]\s*(?<name>.+?)\s*$", RegexOptions.Compiled), // 12x Iron Ore
+        new(@"^\s*(?<name>.+?)\s+(?<qty>\d+)\s*$",         RegexOptions.Compiled), // Iron Ore 12
+        new(@"^\s*(?<qty>\d+)\s+(?<name>.+?)\s*$",         RegexOptions.Compiled), // 12 Iron Ore
+    ];
 
     private static (List<(string name, int qty)> items, int skipped) ParseList(string text)
     {
@@ -659,10 +669,22 @@ public class MainWindow : Window, IDisposable
         foreach (var raw in text.Split('\n'))
         {
             if (string.IsNullOrWhiteSpace(raw)) continue;
-            var m = ListLineRegex.Match(raw);
-            if (!m.Success) { skipped++; continue; }
-            if (!int.TryParse(m.Groups[1].Value, out var qty) || qty < 1) { skipped++; continue; }
-            items.Add((m.Groups[2].Value.Trim(), qty));
+
+            var matched = false;
+            foreach (var rx in ListLineRegexes)
+            {
+                var m = rx.Match(raw);
+                if (!m.Success) continue;
+                // A matched pattern with an unusable qty is intentionally dropped
+                // (not retried against looser patterns).
+                if (int.TryParse(m.Groups["qty"].Value, out var qty) && qty >= 1)
+                {
+                    items.Add((m.Groups["name"].Value.Trim(), qty));
+                    matched = true;
+                }
+                break;
+            }
+            if (!matched) skipped++;
         }
         return (items, skipped);
     }
@@ -672,7 +694,7 @@ public class MainWindow : Window, IDisposable
         var (items, skipped) = ParseList(_newProjectList);
         if (items.Count == 0)
         {
-            _newProjectError = "No valid lines (expected e.g. \"12x Iron Ore\").";
+            _newProjectError = "No valid lines (expected e.g. \"12x Iron Ore\" or \"Iron Ore x12\").";
             return;
         }
         var name = string.IsNullOrWhiteSpace(_newProjectName) ? "Imported project" : _newProjectName.Trim();
