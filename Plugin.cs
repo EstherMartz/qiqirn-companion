@@ -50,6 +50,7 @@ public sealed class Plugin : IDalamudPlugin
         // Services
         _api = new ApiClient(Config.ApiBaseUrl);
         ItemInteractions.Initialize(chatGui);
+        GatheringData.Initialize(dataManager);
         _salesTracker = new SalesTracker(chatGui, dataManager, Config);
 
         // Hotkey service + unified settings panel (constructed before the windows
