@@ -66,5 +66,7 @@ public static class ItemInteractions
             GameActions.SearchForItem(itemId);
         if (ImGui.MenuItem("Search Recipes / Open Recipe Log"))
             GameActions.OpenRecipeLog(itemId);
+        if (GatheringData.IsGatherable(itemId) && ImGui.MenuItem("Open Gathering Log"))
+            GameActions.OpenGatheringLog(itemId);
     }
 }

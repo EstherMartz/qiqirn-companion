@@ -32,6 +32,15 @@ public class MainWindow : Window, IDisposable
     private string?             _selectedPhaseKey    = null;   // "partKey\0phaseIndex"; null = all
     private readonly Dictionary<int, int> _progressAmounts = new();  // per-task "Add" input value
 
+    // Projects filter bar state.
+    private string _filterCategory = "All";
+    private string _filterJob      = "All";
+    private bool   _hideCrystals   = false;
+
+    // Elemental shards (2-7), crystals (8-13) and clusters (14-19) occupy this
+    // contiguous item-id block.
+    private const int CrystalIdMin = 2;
+    private const int CrystalIdMax = 19;
 
     // New-project form state
     private bool                       _showNewProject     = false;
@@ -188,6 +197,7 @@ public class MainWindow : Window, IDisposable
         if (_projectDetail is not null)
         {
             DrawPhaseBar(_projectDetail);
+            DrawProjectFilters(_projectDetail);
             DrawTasksTable(_projectDetail);
         }
 
@@ -241,6 +251,51 @@ public class MainWindow : Window, IDisposable
         ImGui.Spacing();
     }
 
+    // Filter row above the tasks table. Dropdown options are built from the
+    // tasks actually present so no empty option is ever offered; if a previously
+    // selected value is gone after loading another project, it resets to "All".
+    private void DrawProjectFilters(ApiProjectDetail detail)
+    {
+        var categories = new List<string> { "All" };
+        foreach (var t in detail.Tasks)
+        {
+            var c = CategoryLabel(t.Source);
+            if (!categories.Contains(c)) categories.Add(c);
+        }
+        if (!categories.Contains(_filterCategory)) _filterCategory = "All";
+
+        var jobs = new List<string> { "All" };
+        foreach (var t in detail.Tasks)
+        {
+            var j = JobLabel(t.Meta);
+            if (j != "—" && !jobs.Contains(j)) jobs.Add(j);
+        }
+        if (!jobs.Contains(_filterJob)) _filterJob = "All";
+
+        var catIdx = Math.Max(0, categories.IndexOf(_filterCategory));
+        ImGui.SetNextItemWidth(120);
+        if (ImGui.Combo("Category##filter", ref catIdx, categories.ToArray(), categories.Count))
+            _filterCategory = categories[catIdx];
+
+        ImGui.SameLine();
+        var jobIdx = Math.Max(0, jobs.IndexOf(_filterJob));
+        ImGui.SetNextItemWidth(140);
+        if (ImGui.Combo("Job##filter", ref jobIdx, jobs.ToArray(), jobs.Count))
+            _filterJob = jobs[jobIdx];
+
+        ImGui.SameLine();
+        ImGui.Checkbox("Hide crystals", ref _hideCrystals);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Hide shards, crystals and clusters");
+
+        ImGui.SameLine();
+        if (ImGui.SmallButton("× Clear"))
+        {
+            _filterCategory = "All";
+            _filterJob      = "All";
+            _hideCrystals   = false;
+        }
+    }
+
     private void DrawTasksTable(ApiProjectDetail detail)
     {
         const ImGuiTableFlags flags =
@@ -252,9 +307,11 @@ public class MainWindow : Window, IDisposable
 
         // Reserve height for the footer line below the table.
         var tableHeight = ImGui.GetContentRegionAvail().Y - ImGui.GetFrameHeightWithSpacing() * 2;
-        if (!ImGui.BeginTable("##tasks", 5, flags, new Vector2(0, tableHeight))) return;
+        if (!ImGui.BeginTable("##tasks", 7, flags, new Vector2(0, tableHeight))) return;
 
         ImGui.TableSetupColumn("Item",     ImGuiTableColumnFlags.WidthStretch);
+        ImGui.TableSetupColumn("Category", ImGuiTableColumnFlags.WidthFixed, 90);
+        ImGui.TableSetupColumn("Job",      ImGuiTableColumnFlags.WidthFixed, 110);
         ImGui.TableSetupColumn("Qty",      ImGuiTableColumnFlags.WidthFixed, 60);
         ImGui.TableSetupColumn("Status",   ImGuiTableColumnFlags.WidthFixed, 70);
         ImGui.TableSetupColumn("Assignee", ImGuiTableColumnFlags.WidthFixed, 140);
@@ -266,6 +323,9 @@ public class MainWindow : Window, IDisposable
         foreach (var task in detail.Tasks)
         {
             if (_selectedPhaseKey != null && PhaseKeyOf(task) != _selectedPhaseKey) continue;
+            if (_filterCategory != "All" && CategoryLabel(task.Source) != _filterCategory) continue;
+            if (_filterJob != "All" && JobLabel(task.Meta) != _filterJob) continue;
+            if (_hideCrystals && task.ItemId is >= CrystalIdMin and <= CrystalIdMax) continue;
 
             ImGui.TableNextRow();
 
@@ -274,9 +334,15 @@ public class MainWindow : Window, IDisposable
             ItemInteractions.HandleRow((uint)task.ItemId, task.ItemName);
 
             ImGui.TableSetColumnIndex(1);
-            ImGui.TextUnformatted($"{task.QtyDone}/{task.QtyNeeded}");
+            ImGui.TextUnformatted(CategoryLabel(task.Source));
 
             ImGui.TableSetColumnIndex(2);
+            ImGui.TextUnformatted(JobLabel(task.Meta));
+
+            ImGui.TableSetColumnIndex(3);
+            ImGui.TextUnformatted($"{task.QtyDone}/{task.QtyNeeded}");
+
+            ImGui.TableSetColumnIndex(4);
             var statusColor = task.Status switch
             {
                 "done"    => new Vector4(0.4f, 0.9f, 0.4f, 1),
@@ -285,10 +351,10 @@ public class MainWindow : Window, IDisposable
             };
             ImGui.TextColored(statusColor, task.Status);
 
-            ImGui.TableSetColumnIndex(3);
+            ImGui.TableSetColumnIndex(5);
             ImGui.TextUnformatted(ResolveAssignee(detail, task));
 
-            ImGui.TableSetColumnIndex(4);
+            ImGui.TableSetColumnIndex(6);
             ImGui.PushID(task.Id);
             if (_claimInProgress) ImGui.BeginDisabled();
             if (task.Status == "open")
@@ -346,6 +412,35 @@ public class MainWindow : Window, IDisposable
         return "—";
     }
 
+    // Maps a backend task source ("craft"/"gather"/…) to the Category column /
+    // filter label. Mirrors ffxiv-helper's craftRender.ts source set.
+    private static string CategoryLabel(string? source) => source switch
+    {
+        "craft"    => "Craft",
+        "workshop" => "Workshop",
+        "gather"   => "Gather",
+        "market"   => "Market",
+        "vendor"   => "Vendor",
+        "currency" => "Currency",
+        _          => "—",
+    };
+
+    // Maps a task's crafter job code (meta.job) to a full job name. Only craft/
+    // workshop tasks carry one; gather/market/vendor/currency show an em dash.
+    private static string JobLabel(TaskMeta? meta) => meta?.Job switch
+    {
+        "CRP" => "Carpenter",
+        "BSM" => "Blacksmith",
+        "ARM" => "Armorer",
+        "GSM" => "Goldsmith",
+        "LTW" => "Leatherworker",
+        "WVR" => "Weaver",
+        "ALC" => "Alchemist",
+        "CUL" => "Culinarian",
+        "ANY" => "Any",
+        _     => "—",
+    };
+
     private void SortTasksIfNeeded(List<ApiTask> tasks)
     {
         var specs = ImGui.TableGetSortSpecs();
@@ -356,9 +451,11 @@ public class MainWindow : Window, IDisposable
         Comparison<ApiTask> cmp = spec.ColumnIndex switch
         {
             0 => (a, b) => string.Compare(a.ItemName, b.ItemName, StringComparison.OrdinalIgnoreCase),
-            1 => (a, b) => a.QtyNeeded.CompareTo(b.QtyNeeded),
-            2 => (a, b) => string.Compare(a.Status, b.Status, StringComparison.OrdinalIgnoreCase),
-            3 => (a, b) => string.Compare(a.AssigneeId ?? "", b.AssigneeId ?? "", StringComparison.OrdinalIgnoreCase),
+            1 => (a, b) => string.Compare(CategoryLabel(a.Source), CategoryLabel(b.Source), StringComparison.OrdinalIgnoreCase),
+            2 => (a, b) => string.Compare(JobLabel(a.Meta), JobLabel(b.Meta), StringComparison.OrdinalIgnoreCase),
+            3 => (a, b) => a.QtyNeeded.CompareTo(b.QtyNeeded),
+            4 => (a, b) => string.Compare(a.Status, b.Status, StringComparison.OrdinalIgnoreCase),
+            5 => (a, b) => string.Compare(a.AssigneeId ?? "", b.AssigneeId ?? "", StringComparison.OrdinalIgnoreCase),
             _ => (a, b) => 0,
         };
         tasks.Sort((a, b) => asc ? cmp(a, b) : -cmp(a, b));
@@ -577,7 +674,7 @@ public class MainWindow : Window, IDisposable
             ImGui.TextColored(new Vector4(1, 0.3f, 0.3f, 1), _newProjectError);
 
         ImGui.Separator();
-        ImGui.TextDisabled("Or paste a list (e.g. \"12x Iron Ore\"):");
+        ImGui.TextDisabled("Or paste a list (e.g. \"12x Iron Ore\" or \"Iron Ore x12\"):");
         ImGui.InputTextMultiline("##nplist", ref _newProjectList, 16384, new Vector2(280, 90));
 
         var canImport = !_newProjectBusy && !string.IsNullOrEmpty(_config.GuildId) && !string.IsNullOrWhiteSpace(_newProjectList);
@@ -648,9 +745,19 @@ public class MainWindow : Window, IDisposable
         });
     }
 
-    // Parse "12x Item Name" lines (qty prefixes x/X/× supported). Skips blank lines
-    // and lines with qty < 1. Returns parsed (name, qty) pairs and the unparseable-line count.
-    private static readonly Regex ListLineRegex = new(@"^\s*(\d+)\s*[xX×]\s*(.+?)\s*$", RegexOptions.Compiled);
+    // Parse list lines in either order, with or without an "x" marker. Patterns
+    // are tried in order and the FIRST match wins, so "x"-marked forms beat
+    // bare-number forms — that keeps names with embedded digits intact
+    // (e.g. "Grade 4 Tincture x3" → qty 3, not 4). Skips blank lines and lines
+    // with qty < 1. Returns the parsed (name, qty) pairs and the count of
+    // unparseable lines.
+    private static readonly Regex[] ListLineRegexes =
+    [
+        new(@"^\s*(?<name>.+?)\s*[xX×]\s*(?<qty>\d+)\s*$", RegexOptions.Compiled), // Iron Ore x12
+        new(@"^\s*(?<qty>\d+)\s*[xX×]\s*(?<name>.+?)\s*$", RegexOptions.Compiled), // 12x Iron Ore
+        new(@"^\s*(?<name>.+?)\s+(?<qty>\d+)\s*$",         RegexOptions.Compiled), // Iron Ore 12
+        new(@"^\s*(?<qty>\d+)\s+(?<name>.+?)\s*$",         RegexOptions.Compiled), // 12 Iron Ore
+    ];
 
     private static (List<(string name, int qty)> items, int skipped) ParseList(string text)
     {
@@ -659,10 +766,22 @@ public class MainWindow : Window, IDisposable
         foreach (var raw in text.Split('\n'))
         {
             if (string.IsNullOrWhiteSpace(raw)) continue;
-            var m = ListLineRegex.Match(raw);
-            if (!m.Success) { skipped++; continue; }
-            if (!int.TryParse(m.Groups[1].Value, out var qty) || qty < 1) { skipped++; continue; }
-            items.Add((m.Groups[2].Value.Trim(), qty));
+
+            var matched = false;
+            foreach (var rx in ListLineRegexes)
+            {
+                var m = rx.Match(raw);
+                if (!m.Success) continue;
+                // A matched pattern with an unusable qty is intentionally dropped
+                // (not retried against looser patterns).
+                if (int.TryParse(m.Groups["qty"].Value, out var qty) && qty >= 1)
+                {
+                    items.Add((m.Groups["name"].Value.Trim(), qty));
+                    matched = true;
+                }
+                break;
+            }
+            if (!matched) skipped++;
         }
         return (items, skipped);
     }
@@ -672,7 +791,7 @@ public class MainWindow : Window, IDisposable
         var (items, skipped) = ParseList(_newProjectList);
         if (items.Count == 0)
         {
-            _newProjectError = "No valid lines (expected e.g. \"12x Iron Ore\").";
+            _newProjectError = "No valid lines (expected e.g. \"12x Iron Ore\" or \"Iron Ore x12\").";
             return;
         }
         var name = string.IsNullOrWhiteSpace(_newProjectName) ? "Imported project" : _newProjectName.Trim();

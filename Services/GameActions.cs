@@ -34,6 +34,17 @@ public static class GameActions
     }
 
     /// <summary>
+    /// Open the in-game Gathering Log to this item (native "Gathering Log"),
+    /// which shows the zones and nodes where it can be collected.
+    /// </summary>
+    public static unsafe void OpenGatheringLog(uint itemId)
+    {
+        // Native signature takes a ushort; gatherable item row ids fit (HQ/collectable
+        // offsets that exceed ushort are stripped before this is ever called).
+        AgentGatheringNote.Instance()->OpenGatherableByItemId((ushort)itemId);
+    }
+
+    /// <summary>
     /// Open the in-game item search list for this item (native "Search for Item").
     /// </summary>
     public static unsafe void SearchForItem(uint itemId)
