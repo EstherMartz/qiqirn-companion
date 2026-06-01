@@ -43,6 +43,17 @@ public sealed class ContextMenuService : IDisposable
             PrefixColor = 706,
             OnClicked   = _ => _openItem(itemId, name),
         });
+
+        if (GatheringData.IsGatherable(itemId))
+        {
+            args.AddMenuItem(new MenuItem
+            {
+                Name        = "Gather Item",
+                PrefixChar  = 'Q',
+                PrefixColor = 706,
+                OnClicked   = _ => GameActions.OpenGatheringLog(itemId),
+            });
+        }
     }
 
     private static unsafe bool TryResolveItemId(IMenuOpenedArgs args, out uint itemId)
