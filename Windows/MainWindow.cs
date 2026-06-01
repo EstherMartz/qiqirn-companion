@@ -346,6 +346,35 @@ public class MainWindow : Window, IDisposable
         return "—";
     }
 
+    // Maps a backend task source ("craft"/"gather"/…) to the Category column /
+    // filter label. Mirrors ffxiv-helper's craftRender.ts source set.
+    private static string CategoryLabel(string? source) => source switch
+    {
+        "craft"    => "Craft",
+        "workshop" => "Workshop",
+        "gather"   => "Gather",
+        "market"   => "Market",
+        "vendor"   => "Vendor",
+        "currency" => "Currency",
+        _          => "—",
+    };
+
+    // Maps a task's crafter job code (meta.job) to a full job name. Only craft/
+    // workshop tasks carry one; gather/market/vendor/currency show an em dash.
+    private static string JobLabel(TaskMeta? meta) => meta?.Job switch
+    {
+        "CRP" => "Carpenter",
+        "BSM" => "Blacksmith",
+        "ARM" => "Armorer",
+        "GSM" => "Goldsmith",
+        "LTW" => "Leatherworker",
+        "WVR" => "Weaver",
+        "ALC" => "Alchemist",
+        "CUL" => "Culinarian",
+        "ANY" => "Any",
+        _     => "—",
+    };
+
     private void SortTasksIfNeeded(List<ApiTask> tasks)
     {
         var specs = ImGui.TableGetSortSpecs();
