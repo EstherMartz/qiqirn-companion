@@ -3,7 +3,7 @@
   "Name": "Qiqirn Companion",
   "Description": "Browse open FC craft projects and claim tasks directly from inside the game. Also shows what you can craft from your current inventory with current Marketboard prices.",
   "Punchline": "In-game FC project tracker and craft-from-inventory helper.",
-  "Changelog": "Settings tab: bind a hotkey to toggle the window (press-to-bind), with all settings unified in one place; character and home world are now auto-detected from the game.",
+  "Changelog": "Create FC craft projects from inside the game, including pasting a list to import (unmatched item names are flagged). Log progress, set, and complete claimed tasks. Export a project's crafting list to text. New Settings tab: bind a hotkey to toggle the window (press-to-bind), with all settings unified in one place; character and home world are now auto-detected from the game.",
   "Tags": [
     "crafting",
     "inventory",
