@@ -32,6 +32,15 @@ public class MainWindow : Window, IDisposable
     private string?             _selectedPhaseKey    = null;   // "partKey\0phaseIndex"; null = all
     private readonly Dictionary<int, int> _progressAmounts = new();  // per-task "Add" input value
 
+    // Projects filter bar state.
+    private string _filterCategory = "All";
+    private string _filterJob      = "All";
+    private bool   _hideCrystals   = false;
+
+    // Elemental shards (2-7), crystals (8-13) and clusters (14-19) occupy this
+    // contiguous item-id block.
+    private const int CrystalIdMin = 2;
+    private const int CrystalIdMax = 19;
 
     // New-project form state
     private bool                       _showNewProject     = false;
@@ -188,6 +197,7 @@ public class MainWindow : Window, IDisposable
         if (_projectDetail is not null)
         {
             DrawPhaseBar(_projectDetail);
+            DrawProjectFilters(_projectDetail);
             DrawTasksTable(_projectDetail);
         }
 
@@ -241,6 +251,51 @@ public class MainWindow : Window, IDisposable
         ImGui.Spacing();
     }
 
+    // Filter row above the tasks table. Dropdown options are built from the
+    // tasks actually present so no empty option is ever offered; if a previously
+    // selected value is gone after loading another project, it resets to "All".
+    private void DrawProjectFilters(ApiProjectDetail detail)
+    {
+        var categories = new List<string> { "All" };
+        foreach (var t in detail.Tasks)
+        {
+            var c = CategoryLabel(t.Source);
+            if (!categories.Contains(c)) categories.Add(c);
+        }
+        if (!categories.Contains(_filterCategory)) _filterCategory = "All";
+
+        var jobs = new List<string> { "All" };
+        foreach (var t in detail.Tasks)
+        {
+            var j = JobLabel(t.Meta);
+            if (j != "—" && !jobs.Contains(j)) jobs.Add(j);
+        }
+        if (!jobs.Contains(_filterJob)) _filterJob = "All";
+
+        var catIdx = Math.Max(0, categories.IndexOf(_filterCategory));
+        ImGui.SetNextItemWidth(120);
+        if (ImGui.Combo("Category##filter", ref catIdx, categories.ToArray(), categories.Count))
+            _filterCategory = categories[catIdx];
+
+        ImGui.SameLine();
+        var jobIdx = Math.Max(0, jobs.IndexOf(_filterJob));
+        ImGui.SetNextItemWidth(140);
+        if (ImGui.Combo("Job##filter", ref jobIdx, jobs.ToArray(), jobs.Count))
+            _filterJob = jobs[jobIdx];
+
+        ImGui.SameLine();
+        ImGui.Checkbox("Hide crystals", ref _hideCrystals);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Hide shards, crystals and clusters");
+
+        ImGui.SameLine();
+        if (ImGui.SmallButton("× Clear"))
+        {
+            _filterCategory = "All";
+            _filterJob      = "All";
+            _hideCrystals   = false;
+        }
+    }
+
     private void DrawTasksTable(ApiProjectDetail detail)
     {
         const ImGuiTableFlags flags =
@@ -268,6 +323,9 @@ public class MainWindow : Window, IDisposable
         foreach (var task in detail.Tasks)
         {
             if (_selectedPhaseKey != null && PhaseKeyOf(task) != _selectedPhaseKey) continue;
+            if (_filterCategory != "All" && CategoryLabel(task.Source) != _filterCategory) continue;
+            if (_filterJob != "All" && JobLabel(task.Meta) != _filterJob) continue;
+            if (_hideCrystals && task.ItemId is >= CrystalIdMin and <= CrystalIdMax) continue;
 
             ImGui.TableNextRow();
 
