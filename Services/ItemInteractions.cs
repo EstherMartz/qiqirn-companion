@@ -19,6 +19,11 @@ public static class ItemInteractions
 
     public static void Initialize(IChatGui chat) => _chat = chat;
 
+    public static void OpenQiqirn(uint itemId)      => Util.OpenLink($"https://qiqirn.tools/item/{itemId}");
+    public static void OpenGarland(uint itemId)     => Util.OpenLink($"https://www.garlandtools.org/db/#item/{itemId}");
+    public static void OpenUniversalis(uint itemId) => Util.OpenLink($"https://universalis.app/market/{itemId}");
+    public static void OpenGamerEscape(string name) => Util.OpenLink($"https://ffxiv.gamerescape.com/wiki/{Uri.EscapeDataString(name.Replace(' ', '_'))}");
+
     public static void HandleRow(uint itemId, string name, bool hq = false, bool copyOnClick = true)
     {
         if (ImGui.IsItemHovered())
@@ -52,13 +57,13 @@ public static class ItemInteractions
         ImGui.Separator();
 
         if (ImGui.MenuItem("View on Qiqirn.tools"))
-            Util.OpenLink($"https://qiqirn.tools/item/{itemId}");
+            OpenQiqirn(itemId);
         if (ImGui.MenuItem("View on GarlandTools"))
-            Util.OpenLink($"https://www.garlandtools.org/db/#item/{itemId}");
+            OpenGarland(itemId);
         if (ImGui.MenuItem("View on Universalis"))
-            Util.OpenLink($"https://universalis.app/market/{itemId}");
+            OpenUniversalis(itemId);
         if (ImGui.MenuItem("View on Gamer Escape"))
-            Util.OpenLink($"https://ffxiv.gamerescape.com/wiki/{Uri.EscapeDataString(name.Replace(' ', '_'))}");
+            OpenGamerEscape(name);
 
         ImGui.Separator();
 
