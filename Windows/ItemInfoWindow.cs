@@ -79,7 +79,11 @@ public class ItemInfoWindow : Window, IDisposable
         }
 
         if (_sources != null)
+        {
+            if (_sources.Verdict != null)
+                DrawVerdict(_sources.Verdict, _sources.RunnerUp);
             DrawSourcesList(_sources);
+        }
     }
 
     private async Task LoadSources(uint itemId)
@@ -109,6 +113,44 @@ public class ItemInfoWindow : Window, IDisposable
         v >= 1_000_000 ? $"{v / 1_000_000.0:F1}M"
         : v >= 1_000   ? $"{v / 1_000.0:F0}k"
         : v.ToString();
+
+    private static Vector4 ToneColor(string tone) => tone switch
+    {
+        "gold" => new Vector4(0.90f, 0.75f, 0.30f, 1f),
+        "good" => new Vector4(0.40f, 0.85f, 0.55f, 1f),
+        "aether" => new Vector4(0.40f, 0.70f, 1.00f, 1f),
+        "warn" => new Vector4(0.90f, 0.75f, 0.30f, 1f),
+        "bad"  => new Vector4(0.90f, 0.30f, 0.30f, 1f),
+        _      => new Vector4(0.60f, 0.60f, 0.60f, 1f), // mute
+    };
+
+    private void DrawVerdict(Verdict v, VerdictRunnerUp? runnerUp)
+    {
+        var dim = new Vector4(0.75f, 0.75f, 0.75f, 1f);
+
+        ImGui.TextColored(ToneColor(v.Tone), $"✦ {v.Headline}");
+        ImGui.TextWrapped(v.Rationale);
+        ImGui.Spacing();
+
+        ImGui.TextColored(dim, "Best play:");
+        ImGui.SameLine();
+        ImGui.TextColored(new Vector4(0.9f, 0.75f, 0.3f, 1f), v.BestPlay);
+        ImGui.TextWrapped(v.BestPlayDetail);
+
+        if (v.NetPerUnit > 0)
+        {
+            var green = new Vector4(0.40f, 0.85f, 0.55f, 1f);
+            var roiStr = v.Roi.HasValue ? $"  ·  {Math.Round(v.Roi.Value * 100)}% ROI" : "";
+            ImGui.TextColored(green, $"+{FormatGil(v.NetPerUnit)}/unit  ·  ~+{FormatGil(v.GilPerDay)}/day{roiStr}");
+        }
+
+        ImGui.TextColored(dim, $"Risk: {v.Risk}");
+
+        if (runnerUp != null)
+            ImGui.TextColored(dim, $"also viable: {runnerUp.BestPlay} · +{FormatGil(runnerUp.GilPerDay)}/day");
+
+        ImGui.Separator();
+    }
 
     // FFXIV rarity tiers → name color (2 green, 3 blue, 4 purple, 7 pink); null = common.
     private static Vector4? RarityColor(int rarity) => rarity switch
