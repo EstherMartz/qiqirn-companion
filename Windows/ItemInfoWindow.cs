@@ -58,8 +58,11 @@ public class ItemInfoWindow : Window, IDisposable
 
     public override void Draw()
     {
-        ImGui.TextColored(new Vector4(0.9f, 0.85f, 0.4f, 1), _itemName);
+        var nameColor = (_sources != null ? RarityColor(_sources.Rarity) : null)
+                        ?? new Vector4(0.9f, 0.85f, 0.4f, 1);
+        ImGui.TextColored(nameColor, _itemName);
         ImGui.Separator();
+        if (_sources != null) DrawHeaderMeta(_sources);
 
         if (_error != null)
         {
@@ -106,6 +109,61 @@ public class ItemInfoWindow : Window, IDisposable
         v >= 1_000_000 ? $"{v / 1_000_000.0:F1}M"
         : v >= 1_000   ? $"{v / 1_000.0:F0}k"
         : v.ToString();
+
+    // FFXIV rarity tiers → name color (2 green, 3 blue, 4 purple, 7 pink); null = common.
+    private static Vector4? RarityColor(int rarity) => rarity switch
+    {
+        2 => new Vector4(0.40f, 0.85f, 0.55f, 1f),
+        3 => new Vector4(0.40f, 0.70f, 1.00f, 1f),
+        4 => new Vector4(0.75f, 0.55f, 1.00f, 1f),
+        7 => new Vector4(1.00f, 0.50f, 0.80f, 1f),
+        _ => null,
+    };
+
+    private static string? RarityLabel(int rarity) => rarity switch
+    {
+        2 => "Uncommon",
+        3 => "Rare",
+        4 => "Aetherial",
+        7 => "Legendary",
+        _ => null,
+    };
+
+    // A small bordered metadata chip rendered inline on the current line.
+    private static void DrawChip(string text, Vector4 color)
+    {
+        ImGui.PushStyleColor(ImGuiCol.Border, color);
+        ImGui.PushStyleColor(ImGuiCol.Text, color);
+        ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1f);
+        ImGui.BeginDisabled();
+        ImGui.SmallButton(text);
+        ImGui.EndDisabled();
+        ImGui.PopStyleVar();
+        ImGui.PopStyleColor(2);
+    }
+
+    private void DrawHeaderMeta(ItemSourcesResponse s)
+    {
+        var dim  = new Vector4(0.7f, 0.7f, 0.7f, 1f);
+        var gold = new Vector4(0.9f, 0.75f, 0.3f, 1f);
+
+        bool any = false;
+        if (s.Ilvl > 1)               { DrawChip($"Item Lvl {s.Ilvl}", gold); any = true; }
+        if (!string.IsNullOrEmpty(s.Category)) { if (any) ImGui.SameLine(); DrawChip(s.Category!, dim); any = true; }
+        var rl = RarityLabel(s.Rarity);
+        if (rl != null)               { if (any) ImGui.SameLine(); DrawChip(rl, RarityColor(s.Rarity) ?? dim); any = true; }
+        if (s.CanHq)                  { if (any) ImGui.SameLine(); DrawChip("HQ-Capable", gold); any = true; }
+
+        // External links.
+        uint id = (uint)s.ItemId;
+        if (any) ImGui.SameLine();
+        if (ImGui.SmallButton("Garland")) ItemInteractions.OpenGarland(id);
+        ImGui.SameLine();
+        if (ImGui.SmallButton("GE"))      ItemInteractions.OpenGamerEscape(_itemName);
+        ImGui.SameLine();
+        if (ImGui.SmallButton("UV"))      ItemInteractions.OpenUniversalis(id);
+        ImGui.Separator();
+    }
 
     private void DrawMarketSummary(MarketSummary? market)
     {
