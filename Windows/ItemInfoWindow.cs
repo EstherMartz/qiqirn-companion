@@ -171,6 +171,22 @@ public class ItemInfoWindow : Window, IDisposable
         _ => null,
     };
 
+    private static Vector4 SourceTagColor(string? source) => source switch
+    {
+        "vendor" => new Vector4(0.40f, 0.85f, 0.55f, 1f),
+        "gather" => new Vector4(0.40f, 0.70f, 1.00f, 1f),
+        "craft"  => new Vector4(0.90f, 0.75f, 0.30f, 1f),
+        _        => new Vector4(0.55f, 0.70f, 0.90f, 1f), // mb / null
+    };
+
+    private static string SourceTagLabel(string? source) => source switch
+    {
+        "vendor" => "Vendor",
+        "gather" => "Gather",
+        "craft"  => "Craft",
+        _        => "MB",
+    };
+
     // A small bordered metadata chip rendered inline on the current line.
     private static void DrawChip(string text, Vector4 color)
     {
@@ -248,12 +264,51 @@ public class ItemInfoWindow : Window, IDisposable
     private void DrawRecipeSource(RecipeSource recipe)
     {
         ImGui.TextColored(new Vector4(0.2f, 0.8f, 1, 1), $"📖 {recipe.JobName} (Lv. {recipe.Level})");
-        ImGui.Indent();
-        ImGui.Text($"Yield: {recipe.OutputQty}");
-        ImGui.TextColored(new Vector4(0.8f, 0.8f, 0.8f, 1), "Ingredients:");
-        foreach (var ing in recipe.Ingredients)
-            ImGui.BulletText($"{ing.ItemName} x{ing.Qty}");
-        ImGui.Unindent();
+        ImGui.SameLine();
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1), $"· Yield {recipe.OutputQty}");
+
+        if (ImGui.BeginTable($"##recipe{recipe.JobName}{recipe.Level}", 5,
+                ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.RowBg))
+        {
+            ImGui.TableSetupColumn("Ingredient", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Qty",        ImGuiTableColumnFlags.WidthFixed);
+            ImGui.TableSetupColumn("Unit",       ImGuiTableColumnFlags.WidthFixed);
+            ImGui.TableSetupColumn("Subtotal",   ImGuiTableColumnFlags.WidthFixed);
+            ImGui.TableSetupColumn("Source",     ImGuiTableColumnFlags.WidthFixed);
+            ImGui.TableHeadersRow();
+
+            foreach (var ing in recipe.Ingredients)
+            {
+                ImGui.TableNextRow();
+
+                ImGui.TableNextColumn();
+                ImGui.Selectable($"{ing.ItemName}##ing{ing.ItemId}");
+                ItemInteractions.HandleRow((uint)ing.ItemId, ing.ItemName);
+
+                ImGui.TableNextColumn();
+                ImGui.Text($"x{ing.Qty}");
+
+                ImGui.TableNextColumn();
+                ImGui.Text(ing.UnitPrice.HasValue ? FormatGil(ing.UnitPrice.Value) : "—");
+
+                ImGui.TableNextColumn();
+                ImGui.Text(ing.UnitPrice.HasValue ? FormatGil((long)ing.UnitPrice.Value * ing.Qty) : "—");
+
+                ImGui.TableNextColumn();
+                ImGui.TextColored(SourceTagColor(ing.Source), SourceTagLabel(ing.Source));
+            }
+
+            ImGui.TableNextRow();
+            ImGui.TableNextColumn();
+            ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1), "Material total (home)");
+            ImGui.TableNextColumn();
+            ImGui.TableNextColumn();
+            ImGui.TableNextColumn();
+            ImGui.TextColored(new Vector4(0.9f, 0.75f, 0.3f, 1), FormatGil(recipe.MaterialCost));
+            ImGui.TableNextColumn();
+
+            ImGui.EndTable();
+        }
     }
 
     private void DrawVendorSource(VendorSource vendor)
