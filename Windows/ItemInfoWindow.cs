@@ -240,15 +240,15 @@ public class ItemInfoWindow : Window, IDisposable
     {
         DrawMarketSummary(sources.Market);
 
-        if (sources.Sources.Count == 0)
-        {
-            ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1), "No sources available for this item");
-            return;
-        }
-
+        // Skip null entries: the backend emits a {type:"unknown"} placeholder for
+        // items with no real source, which the converter maps to null. Track
+        // whether anything real was drawn so we can show an honest empty state
+        // instead of a blank window (the verdict, if any, is drawn by Draw()).
+        var hasSource = false;
         foreach (var source in sources.Sources)
         {
             if (source is null) continue;
+            hasSource = true;
             switch (source)
             {
                 case RecipeSource recipe:            DrawRecipeSource(recipe);            break;
@@ -259,6 +259,10 @@ public class ItemInfoWindow : Window, IDisposable
             }
             ImGui.Spacing();
         }
+
+        if (!hasSource && sources.Market == null)
+            ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1),
+                "No market, recipe, or source data for this item.");
     }
 
     private void DrawRecipeSource(RecipeSource recipe)
