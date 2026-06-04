@@ -92,18 +92,21 @@ public abstract record ItemSource(
 );
 
 public record IngredientItem(
-    [property: JsonPropertyName("itemId")]   int    ItemId,
-    [property: JsonPropertyName("itemName")] string ItemName,
-    [property: JsonPropertyName("qty")]      int    Qty
+    [property: JsonPropertyName("itemId")]    int     ItemId,
+    [property: JsonPropertyName("itemName")]  string  ItemName,
+    [property: JsonPropertyName("qty")]       int     Qty,
+    [property: JsonPropertyName("unitPrice")] int?    UnitPrice,
+    [property: JsonPropertyName("source")]    string? Source
 );
 
 public record RecipeSource(
     string                               Type,
-    [property: JsonPropertyName("jobId")]       int                  JobId,
-    [property: JsonPropertyName("jobName")]     string               JobName,
-    [property: JsonPropertyName("level")]       int                  Level,
-    [property: JsonPropertyName("ingredients")] List<IngredientItem> Ingredients,
-    [property: JsonPropertyName("outputQty")]   int                  OutputQty
+    [property: JsonPropertyName("jobId")]        int                  JobId,
+    [property: JsonPropertyName("jobName")]      string               JobName,
+    [property: JsonPropertyName("level")]        int                  Level,
+    [property: JsonPropertyName("ingredients")]  List<IngredientItem> Ingredients,
+    [property: JsonPropertyName("outputQty")]    int                  OutputQty,
+    [property: JsonPropertyName("materialCost")] int                  MaterialCost
 ) : ItemSource(Type);
 
 public record VendorSource(
@@ -171,11 +174,37 @@ public record MarketSummary(
     [property: JsonPropertyName("cheapestPrice")] int?    CheapestPrice
 );
 
+public record Verdict(
+    [property: JsonPropertyName("headline")]       string  Headline,
+    [property: JsonPropertyName("rationale")]      string  Rationale,
+    [property: JsonPropertyName("bestPlay")]       string  BestPlay,
+    [property: JsonPropertyName("bestPlayDetail")] string  BestPlayDetail,
+    [property: JsonPropertyName("netPerUnit")]     long    NetPerUnit,
+    [property: JsonPropertyName("gilPerDay")]      long    GilPerDay,
+    [property: JsonPropertyName("roi")]            double? Roi,
+    [property: JsonPropertyName("risk")]           string  Risk,
+    [property: JsonPropertyName("tone")]           string  Tone,
+    [property: JsonPropertyName("quality")]        string  Quality,
+    [property: JsonPropertyName("kind")]           string  Kind
+);
+
+public record VerdictRunnerUp(
+    [property: JsonPropertyName("bestPlay")]  string BestPlay,
+    [property: JsonPropertyName("gilPerDay")] long   GilPerDay,
+    [property: JsonPropertyName("kind")]      string Kind
+);
+
 public record ItemSourcesResponse(
-    [property: JsonPropertyName("itemId")]   int ItemId,
-    [property: JsonPropertyName("itemName")] string ItemName,
-    [property: JsonPropertyName("sources")]  List<ItemSource> Sources,
-    [property: JsonPropertyName("market")]   MarketSummary? Market
+    [property: JsonPropertyName("itemId")]   int               ItemId,
+    [property: JsonPropertyName("itemName")] string            ItemName,
+    [property: JsonPropertyName("ilvl")]     int               Ilvl,
+    [property: JsonPropertyName("category")] string?           Category,
+    [property: JsonPropertyName("rarity")]   int               Rarity,
+    [property: JsonPropertyName("canHq")]    bool              CanHq,
+    [property: JsonPropertyName("sources")]  List<ItemSource>  Sources,
+    [property: JsonPropertyName("market")]   MarketSummary?    Market,
+    [property: JsonPropertyName("verdict")]  Verdict?          Verdict,
+    [property: JsonPropertyName("runnerUp")] VerdictRunnerUp?  RunnerUp
 );
 
 public record TradingQueryRow(
