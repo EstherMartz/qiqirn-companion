@@ -18,6 +18,10 @@
   <ItemGroup>
     <!-- Copy manifest alongside DLL — Dalamud v15 reads {AssemblyName}.json next to the DLL -->
     <None Include="QiqirnCompanion.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Ruleta window background, embedded into the DLL so it ships inside
+         latest.zip with no packaging changes and is loaded via ITextureProvider
+         .GetFromManifestResource (resource name "QiqirnCompanion.bg.jpeg"). -->
+    <EmbeddedResource Include="bg.jpeg" />
   </ItemGroup>
 
   <ItemGroup>

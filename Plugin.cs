@@ -40,7 +40,8 @@ public sealed class Plugin : IDalamudPlugin
         IDataManager            dataManager,
         IContextMenu            contextMenu,
         IFramework              framework,
-        IKeyState               keyState)
+        IKeyState               keyState,
+        ITextureProvider        textureProvider)
     {
         _pi          = pluginInterface;
         _commands    = commandManager;
@@ -66,7 +67,7 @@ public sealed class Plugin : IDalamudPlugin
         _tradingWindow = new TradingWindow(_api);
         _plannerWindow = new PlannerWindow(Config, _salesTracker);
         _cleanupWindow = new CleanupWindow(_api);
-        _ruletaWindow  = new RuletaWindow();
+        _ruletaWindow  = new RuletaWindow(textureProvider);
         _mainWindow    = new MainWindow(Config, _api, playerState, _searchWindow, _tradingWindow, _plannerWindow, _cleanupWindow, _settingsPanel);
         _configWindow  = new ConfigWindow(_settingsPanel);
         _windowSystem.AddWindow(_mainWindow);
