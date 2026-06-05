@@ -31,7 +31,7 @@ public class RuletaWindow : Window, IDisposable
 
     public override void Draw()
     {
-        ImGui.TextWrapped("Introduce el nombre y los cortes disponibles, y dale a Daleee.");
+        ImGui.TextWrapped("Vamo' a ponernos guapis.");
         ImGui.Spacing();
 
         ImGui.SetNextItemWidth(-1);
