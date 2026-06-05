@@ -1,3 +1,4 @@
+using System;
 using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
@@ -25,6 +26,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly TradingWindow _tradingWindow;
     private readonly PlannerWindow _plannerWindow;
     private readonly CleanupWindow _cleanupWindow;
+    private readonly RuletaWindow  _ruletaWindow;
     private readonly SalesTracker  _salesTracker;
     private readonly ContextMenuService _contextMenuService;
     private readonly HotkeyService  _hotkeyService;
@@ -64,6 +66,7 @@ public sealed class Plugin : IDalamudPlugin
         _tradingWindow = new TradingWindow(_api);
         _plannerWindow = new PlannerWindow(Config, _salesTracker);
         _cleanupWindow = new CleanupWindow(_api);
+        _ruletaWindow  = new RuletaWindow();
         _mainWindow    = new MainWindow(Config, _api, playerState, _searchWindow, _tradingWindow, _plannerWindow, _cleanupWindow, _settingsPanel);
         _configWindow  = new ConfigWindow(_settingsPanel);
         _windowSystem.AddWindow(_mainWindow);
@@ -73,6 +76,7 @@ public sealed class Plugin : IDalamudPlugin
         _windowSystem.AddWindow(_tradingWindow);
         _windowSystem.AddWindow(_plannerWindow);
         _windowSystem.AddWindow(_cleanupWindow);
+        _windowSystem.AddWindow(_ruletaWindow);
 
         // Native game right-click menu → open item info.
         _contextMenuService = new ContextMenuService(contextMenu, dataManager, _itemInfoWindow.Show);
@@ -95,6 +99,15 @@ public sealed class Plugin : IDalamudPlugin
         if (query.Length == 0)
         {
             ToggleMain();
+            return;
+        }
+
+        // Hidden easter egg: /qiqirn ruleta opens the styling-roulette window.
+        // Must be checked before the search path, or it would search for an
+        // item literally named "ruleta".
+        if (query.Equals("ruleta", StringComparison.OrdinalIgnoreCase))
+        {
+            _ruletaWindow.Toggle();
             return;
         }
 
