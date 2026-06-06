@@ -31,6 +31,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ContextMenuService _contextMenuService;
     private readonly HotkeyService  _hotkeyService;
     private readonly SettingsPanel  _settingsPanel;
+    private readonly CraftListsWindow _craftListsWindow;
 
     public Plugin(
         IDalamudPluginInterface pluginInterface,
@@ -68,7 +69,8 @@ public sealed class Plugin : IDalamudPlugin
         _plannerWindow = new PlannerWindow(Config, _salesTracker);
         _cleanupWindow = new CleanupWindow(_api);
         _ruletaWindow  = new RuletaWindow(textureProvider);
-        _mainWindow    = new MainWindow(Config, _api, playerState, _searchWindow, _tradingWindow, _plannerWindow, _cleanupWindow, _settingsPanel);
+        _craftListsWindow = new CraftListsWindow(Config, _api);
+        _mainWindow    = new MainWindow(Config, _api, playerState, _searchWindow, _tradingWindow, _plannerWindow, _cleanupWindow, _settingsPanel, _craftListsWindow);
         _configWindow  = new ConfigWindow(_settingsPanel);
         _windowSystem.AddWindow(_mainWindow);
         _windowSystem.AddWindow(_configWindow);

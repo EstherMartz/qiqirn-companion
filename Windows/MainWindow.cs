@@ -20,6 +20,7 @@ public class MainWindow : Window, IDisposable
     private readonly PlannerWindow _plannerWindow;
     private readonly CleanupWindow _cleanupWindow;
     private readonly SettingsPanel  _settingsPanel;
+    private readonly CraftListsWindow _craftListsWindow;
 
     // ── Projects tab state ────────────────────────────────────────────────────
     private List<ApiProject>    _projects            = [];
@@ -61,7 +62,7 @@ public class MainWindow : Window, IDisposable
     private int                 _maxMissing       = 0;
     private string              _craftExportStatus = string.Empty;
 
-    public MainWindow(Configuration config, ApiClient api, IPlayerState playerState, SearchWindow searchWindow, TradingWindow tradingWindow, PlannerWindow plannerWindow, CleanupWindow cleanupWindow, SettingsPanel settingsPanel)
+    public MainWindow(Configuration config, ApiClient api, IPlayerState playerState, SearchWindow searchWindow, TradingWindow tradingWindow, PlannerWindow plannerWindow, CleanupWindow cleanupWindow, SettingsPanel settingsPanel, CraftListsWindow craftListsWindow)
         : base("Qiqirn Companion##main", ImGuiWindowFlags.None)
     {
         _config        = config;
@@ -72,6 +73,7 @@ public class MainWindow : Window, IDisposable
         _plannerWindow = plannerWindow;
         _cleanupWindow = cleanupWindow;
         _settingsPanel = settingsPanel;
+        _craftListsWindow = craftListsWindow;
 
         SizeConstraints = new WindowSizeConstraints
         {
@@ -95,6 +97,7 @@ public class MainWindow : Window, IDisposable
         DrawSearchTab();
         DrawPlannerTab();
         DrawProjectsTab();
+        DrawCraftListsTab();
         DrawCraftingTab();
         DrawCleanupTab();
         DrawSettingsTab();
@@ -210,6 +213,13 @@ public class MainWindow : Window, IDisposable
             ImGui.TextColored(new Vector4(1, 0.3f, 0.3f, 1), _claimError);
         }
 
+        ImGui.EndTabItem();
+    }
+
+    private void DrawCraftListsTab()
+    {
+        if (!ImGui.BeginTabItem("Craft Lists")) return;
+        _craftListsWindow.DrawContent();
         ImGui.EndTabItem();
     }
 
