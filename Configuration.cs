@@ -1,8 +1,10 @@
 using Dalamud.Configuration;
 using Dalamud.Game.ClientState.Keys;
 using Dalamud.Plugin;
+using QiqirnCompanion.Models;
 using QiqirnCompanion.Planner;
 using System;
+using System.Collections.Generic;
 
 namespace QiqirnCompanion;
 
@@ -30,6 +32,12 @@ public class Configuration : IPluginConfiguration
 
     /// <summary>Standalone gil planner state (seeded on first use).</summary>
     public PlannerData? Planner { get; set; }
+
+    /// <summary>Crafting lists imported via qq:list: paste-code, persisted locally.</summary>
+    public List<ImportedList> ImportedLists { get; set; } = new();
+
+    /// <summary>Id of the currently selected imported list (empty = none).</summary>
+    public string ActiveListId { get; set; } = string.Empty;
 
     /// <summary>Auto-log retainer market sales into the planner from chat.</summary>
     public bool AutoLogRetainerSales { get; set; } = true;

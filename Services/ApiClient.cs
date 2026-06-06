@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using QiqirnCompanion.Models;
 
 namespace QiqirnCompanion.Services;
 
@@ -436,6 +437,19 @@ public class ApiClient : IDisposable
         var data = await res.Content.ReadFromJsonAsync<JsonElement>(_json);
         return JsonSerializer.Deserialize<List<CraftableItem>>(
             data.GetProperty("craftable").GetRawText(), _json) ?? [];
+    }
+
+    /// <summary>Resolve a whole crafting list into final items + flat ingredients
+    /// (sub-crafts by depth, sources, used-to-craft). Reuses the web resolver server-side.</summary>
+    public async Task<ListBreakdown?> GetListBreakdownAsync(IEnumerable<ImportedListItem> items)
+    {
+        var body = new { items = new List<object>() };
+        foreach (var it in items)
+            body.items.Add(new { itemId = it.ItemId, qty = it.Qty, hq = it.Hq });
+        var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        var res     = await _http.PostAsync("api/plugin/craft-breakdown", content);
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<ListBreakdown>(_json);
     }
 
     /// <summary>Search for items by name with pagination.</summary>
