@@ -35,6 +35,12 @@ public class CraftListsWindow
     private bool           _onlyHq           = false;
     private string         _exportStatus     = string.Empty;
 
+    // Recipes tab state
+    private bool           _autoScale        = true;
+    private int            _detailItemId     = 0;
+    private ItemSourcesResponse? _detail     = null;
+    private bool           _detailLoading    = false;
+
     public CraftListsWindow(Configuration config, ApiClient api)
     {
         _config = config;
@@ -130,11 +136,92 @@ public class CraftListsWindow
         ImGui.EndTabItem();
     }
 
-    // Placeholders filled in by Tasks 6 & 7.
+    // ── RECIPES tab ─────────────────────────────────────────────────────────
     private void DrawRecipesTab()
     {
         if (!ImGui.BeginTabItem("Recipes")) return;
-        ImGui.TextDisabled("Recipes view — coming in a later task.");
+
+        var list = Active;
+        if (list == null || _breakdown == null)
+        {
+            ImGui.TextDisabled(_loading ? "Loading…" : "Select a list in the Lists tab.");
+            ImGui.EndTabItem();
+            return;
+        }
+
+        ImGui.Checkbox("Auto-scale sub-crafts", ref _autoScale);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("When on, changing a final item's quantity re-resolves so sub-craft amounts scale with it.");
+        ImGui.Separator();
+
+        // ── Final items (editable qty) ───────────────────────────────────────
+        ImGui.TextDisabled("Final items");
+        foreach (var f in _breakdown.FinalItems)
+        {
+            ImGui.PushID(f.ItemId);
+            var qty = f.Qty;
+            ImGui.SetNextItemWidth(90);
+            if (ImGui.InputInt("##fqty", ref qty))
+            {
+                qty = Math.Clamp(qty, 1, 99999);
+                var li = list.Items.FirstOrDefault(x => x.ItemId == f.ItemId);
+                if (li != null && qty != li.Qty)
+                {
+                    li.Qty = qty;
+                    _config.Save();
+                    if (_autoScale) LoadBreakdown();
+                }
+            }
+            ImGui.SameLine();
+            ImGui.Selectable($"{f.ItemName}{(f.Stars is > 0 ? "  " + new string('★', f.Stars.Value) : "")}");
+            ItemInteractions.HandleRow((uint)f.ItemId, f.ItemName);
+            if (ImGui.IsItemClicked()) LoadDetail(f.ItemId);
+            ImGui.PopID();
+        }
+
+        // ── Sub-crafts grouped by depth ──────────────────────────────────────
+        var crafted = _breakdown.Ingredients.Where(i => i.Source == "Crafted").ToList();
+        foreach (var depth in crafted.Select(i => i.Depth ?? 1).Distinct().OrderBy(d => d))
+        {
+            ImGui.Spacing();
+            ImGui.TextDisabled($"Sub-crafts — Level {depth}");
+            foreach (var c in crafted.Where(i => (i.Depth ?? 1) == depth))
+            {
+                ImGui.Bullet();
+                ImGui.SameLine();
+                ImGui.Selectable($"{c.ItemName}  ×{c.RequiredQty}##sc{c.ItemId}");
+                ItemInteractions.HandleRow((uint)c.ItemId, c.ItemName);
+                if (ImGui.IsItemClicked()) LoadDetail(c.ItemId);
+                if (c.UsedToCraft.Count > 0)
+                {
+                    ImGui.SameLine();
+                    ImGui.TextDisabled($"feeds: {string.Join(", ", c.UsedToCraft)}");
+                }
+            }
+        }
+
+        // ── Selected recipe detail ───────────────────────────────────────────
+        if (_detailItemId != 0)
+        {
+            ImGui.Separator();
+            if (_detailLoading) { ImGui.TextDisabled("Loading recipe…"); }
+            else if (_detail != null)
+            {
+                var recipe = _detail.Sources.OfType<RecipeSource>().FirstOrDefault();
+                ImGui.TextColored(new Vector4(0.85f, 0.7f, 0.35f, 1f), _detail.ItemName);
+                if (recipe != null)
+                {
+                    ImGui.TextDisabled($"{recipe.JobName} · Lv{recipe.Level} · yields {recipe.OutputQty}");
+                    foreach (var ing in recipe.Ingredients)
+                        ImGui.TextUnformatted($"  {ing.Qty}× {ing.ItemName}");
+                }
+                else
+                {
+                    ImGui.TextDisabled("No recipe (gathered / bought).");
+                }
+            }
+        }
+
         ImGui.EndTabItem();
     }
 
@@ -284,6 +371,19 @@ public class CraftListsWindow
             {
                 _loading = false;
             }
+        });
+    }
+
+    private void LoadDetail(int itemId)
+    {
+        _detailItemId  = itemId;
+        _detail        = null;
+        _detailLoading = true;
+        Task.Run(async () =>
+        {
+            try { _detail = await _api.GetItemSourcesAsync(itemId); }
+            catch { /* leave _detail null; UI shows nothing */ }
+            finally { _detailLoading = false; }
         });
     }
 }
