@@ -30,6 +30,11 @@ public class CraftListsWindow
     private bool           _loading     = false;
     private string         _error       = string.Empty;
 
+    // Ingredients tab state
+    private bool           _includeSaddlebag = false;
+    private bool           _onlyHq           = false;
+    private string         _exportStatus     = string.Empty;
+
     public CraftListsWindow(Configuration config, ApiClient api)
     {
         _config = config;
@@ -136,8 +141,121 @@ public class CraftListsWindow
     private void DrawIngredientsTab()
     {
         if (!ImGui.BeginTabItem("Ingredients")) return;
-        ImGui.TextDisabled("Ingredients view — coming in a later task.");
+
+        if (_breakdown == null)
+        {
+            ImGui.TextDisabled(_loading ? "Loading…" : "Select a list in the Lists tab.");
+            ImGui.EndTabItem();
+            return;
+        }
+
+        ImGui.Checkbox("Include Saddlebag", ref _includeSaddlebag);
+        ImGui.SameLine();
+        ImGui.Checkbox("Only show HQ", ref _onlyHq);
+        ImGui.SameLine();
+        if (ImGui.Button("Export remaining as text")) ExportRemaining();
+        if (!string.IsNullOrEmpty(_exportStatus)) { ImGui.SameLine(); ImGui.TextDisabled(_exportStatus); }
+
+        // Live bag inventory (read on the framework draw thread — safe).
+        Dictionary<int, int> inv;
+        try { inv = InventoryReader.AggregatedBags(_includeSaddlebag); }
+        catch { inv = new Dictionary<int, int>(); }
+
+        const ImGuiTableFlags flags =
+            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit;
+        var height = ImGui.GetContentRegionAvail().Y;
+        if (!ImGui.BeginTable("##cl_ingredients", 6, flags, new Vector2(0, height)))
+        {
+            ImGui.EndTabItem();
+            return;
+        }
+
+        ImGui.TableSetupColumn("Item",         ImGuiTableColumnFlags.WidthStretch);
+        ImGui.TableSetupColumn("Required",     ImGuiTableColumnFlags.WidthFixed, 70);
+        ImGui.TableSetupColumn("In Inventory", ImGuiTableColumnFlags.WidthFixed, 90);
+        ImGui.TableSetupColumn("Remaining",    ImGuiTableColumnFlags.WidthFixed, 80);
+        ImGui.TableSetupColumn("Source",       ImGuiTableColumnFlags.WidthFixed, 120);
+        ImGui.TableSetupColumn("Used to Craft",ImGuiTableColumnFlags.WidthStretch);
+        ImGui.TableHeadersRow();
+
+        foreach (var ing in _breakdown.Ingredients)
+        {
+            if (_onlyHq && ing.CanHq != true) continue;
+
+            var have      = inv.GetValueOrDefault(ing.ItemId, 0);
+            var remaining = Math.Max(0, ing.RequiredQty - have);
+            var color     = RowColor(ing.Source, ing.RequiredQty, have);
+
+            ImGui.TableNextRow();
+
+            ImGui.TableSetColumnIndex(0);
+            ImGui.TextColored(color, "●");
+            ImGui.SameLine();
+            ImGui.Selectable(ing.ItemName);
+            ItemInteractions.HandleRow((uint)ing.ItemId, ing.ItemName);
+
+            ImGui.TableSetColumnIndex(1);
+            ImGui.TextUnformatted(ing.RequiredQty.ToString());
+
+            ImGui.TableSetColumnIndex(2);
+            ImGui.TextUnformatted(have.ToString());
+
+            ImGui.TableSetColumnIndex(3);
+            ImGui.TextColored(color, remaining.ToString());
+
+            ImGui.TableSetColumnIndex(4);
+            ImGui.TextUnformatted(SourceLabel(ing.Source));
+
+            ImGui.TableSetColumnIndex(5);
+            ImGui.TextUnformatted(ing.UsedToCraft.Count > 0 ? string.Join(", ", ing.UsedToCraft) : "—");
+        }
+
+        ImGui.EndTable();
+
+        // Legend
+        ImGui.TextDisabled("Green = have enough · Blue = will be crafted · Yellow = partial · Red = gather/buy.  (Retainers not counted.)");
+
         ImGui.EndTabItem();
+    }
+
+    private void ExportRemaining()
+    {
+        if (_breakdown == null) { _exportStatus = "Nothing to export"; return; }
+        Dictionary<int, int> inv;
+        try { inv = InventoryReader.AggregatedBags(_includeSaddlebag); }
+        catch { inv = new Dictionary<int, int>(); }
+
+        var lines = new List<string>();
+        foreach (var ing in _breakdown.Ingredients)
+        {
+            if (_onlyHq && ing.CanHq != true) continue;
+            var remaining = Math.Max(0, ing.RequiredQty - inv.GetValueOrDefault(ing.ItemId, 0));
+            if (remaining > 0) lines.Add($"{ing.ItemName} x{remaining}");
+        }
+        if (lines.Count == 0) { _exportStatus = "Nothing remaining 🎉"; return; }
+        ImGui.SetClipboardText(string.Join("\n", lines));
+        _exportStatus = $"Copied {lines.Count} items";
+    }
+
+    // ── Helper methods ───────────────────────────────────────────────────────
+
+    private static string SourceLabel(string source) => source switch
+    {
+        "Crafted"     => "CRAFTED",
+        "Gathered"    => "GATHERED",
+        "TimedGather" => "TIMED GATHER",
+        "Vendor"      => "VENDOR",
+        "Tome"        => "TOME / TOKEN",
+        "Crystal"     => "CRYSTAL",
+        _             => "MONSTER / OTHER",
+    };
+
+    private static Vector4 RowColor(string source, int required, int inInventory)
+    {
+        if (inInventory >= required) return new Vector4(0.4f, 0.9f, 0.4f, 1f);        // green: have enough
+        if (source == "Crafted")     return new Vector4(0.45f, 0.7f, 1f, 1f);          // blue: will be crafted
+        if (inInventory > 0)         return new Vector4(0.95f, 0.85f, 0.4f, 1f);       // yellow: partial
+        return new Vector4(1f, 0.45f, 0.4f, 1f);                                       // red: need gather/buy
     }
 
     // ── Async ────────────────────────────────────────────────────────────────
